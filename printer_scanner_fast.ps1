@@ -21,7 +21,7 @@ function Decode-HexSerial {
     param([string]$HexSerial)
     
     try {
-        if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0{4})$") {
+        if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-Fa-f0-9]{8})([0-9]{6})(0{4})$") {
             $hexPart = $matches[1]  # First 8 hex characters
             $numberPart = $matches[2]  # Next 6 numbers
             $padding = $matches[3]  # Last 4 zeros
@@ -31,6 +31,7 @@ function Decode-HexSerial {
             for ($i = 0; $i -lt $hexPart.Length; $i += 2) {
                 $hexPair = $hexPart.Substring($i, 2)
                 $byteValue = [Convert]::ToByte($hexPair, 16)
+                # Allow all printable ASCII characters (32-126) and some control chars
                 if ($byteValue -ge 32 -and $byteValue -le 126) {
                     $hexDecoded += [char]$byteValue
                 }
@@ -44,9 +45,22 @@ function Decode-HexSerial {
             }
         }
         
-        # If no Epson pattern found, return original
+        # Standard ASCII decoding (try this after Epson-specific decoding)
+        $bytes = @()
+        for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
+            $bytes += [Convert]::ToByte($HexSerial.Substring($i, 2), 16)
+        }
+        $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
+        
+        # Check if decoded result looks like a valid serial number
+        if ($decodedSerial -match '^[A-Za-z0-9\-_]+$' -and $decodedSerial.Length -gt 0) {
+            return "$HexSerial (Decoded: $decodedSerial)"
+        }
+        
+        # If no valid decoding found, return original hex
         return $HexSerial
     } catch {
+        # Return original hex if decoding fails
         return $HexSerial
     }
 }
@@ -64,48 +78,52 @@ function Get-PrinterInfoFast {
         
         foreach ($device in $usbDevices) {
             # Exclude non-printer devices first
-            if ($device.Name -like "*Fingerprint*" -or
-                $device.Name -like "*Scanner*" -or
-                $device.Name -like "*Camera*" -or
-                $device.Name -like "*Webcam*" -or
-                $device.Name -like "*Microphone*" -or
-                $device.Name -like "*Audio*" -or
-                $device.Name -like "*Speaker*" -or
-                $device.Name -like "*Headset*" -or
-                $device.Name -like "*Mouse*" -or
-                $device.Name -like "*Keyboard*" -or
-                $device.Name -like "*Touchpad*" -or
-                $device.Name -like "*Trackpad*" -or
-                $device.Name -like "*Monitor*" -or
-                $device.Name -like "*Display*" -or
-                $device.Name -like "*Graphics*" -or
-                $device.Name -like "*Video*" -or
-                $device.Name -like "*Network*" -or
-                $device.Name -like "*Ethernet*" -or
-                $device.Name -like "*WiFi*" -or
-                $device.Name -like "*Wireless*" -or
-                $device.Name -like "*Bluetooth*" -or
-                $device.Name -like "*Card Reader*" -or
-                $device.Name -like "*Smart Card*" -or
-                $device.Name -like "*USB Hub*" -or
-                $device.Name -like "*USB Root*" -or
-                $device.Name -like "*Composite*" -or
-                $device.Name -like "*Bus Enumerator*" -or
-                $device.Name -like "*Microsoft*" -or
-                $device.Name -like "*OneNote*" -or
-                $device.Name -like "*Fax*" -or
-                $device.Name -like "*XPS*" -or
-                $device.Name -like "*PDF*" -or
-                $device.Name -like "*Dock*" -or
-                $device.Name -like "*Dell Dock*" -or
-                $device.Name -like "*WD19S*" -or
-                $device.Name -like "*Docking*" -or
-                $device.Name -like "*Port Replicator*") {
+            if (
+                ($device.Name -like "*Fingerprint*" -or
+                 $device.Name -like "*Scanner*" -or
+                 $device.Name -like "*Camera*" -or
+                 $device.Name -like "*Webcam*" -or
+                 $device.Name -like "*Microphone*" -or
+                 $device.Name -like "*Audio*" -or
+                 $device.Name -like "*Speaker*" -or
+                 $device.Name -like "*Headset*" -or
+                 $device.Name -like "*Mouse*" -or
+                 $device.Name -like "*Keyboard*" -or
+                 $device.Name -like "*Touchpad*" -or
+                 $device.Name -like "*Trackpad*" -or
+                 $device.Name -like "*Monitor*" -or
+                 $device.Name -like "*Display*" -or
+                 $device.Name -like "*Graphics*" -or
+                 $device.Name -like "*Video*" -or
+                 $device.Name -like "*Network*" -or
+                 $device.Name -like "*Ethernet*" -or
+                 $device.Name -like "*WiFi*" -or
+                 $device.Name -like "*Wireless*" -or
+                 $device.Name -like "*Bluetooth*" -or
+                 $device.Name -like "*Card Reader*" -or
+                 $device.Name -like "*Smart Card*" -or
+                 $device.Name -like "*USB Hub*" -or
+                 $device.Name -like "*USB Root*" -or
+                 $device.Name -like "*Composite*" -or
+                 $device.Name -like "*Bus Enumerator*" -or
+                 $device.Name -like "*Microsoft*" -or
+                 $device.Name -like "*OneNote*" -or
+                 $device.Name -like "*Fax*" -or
+                 $device.Name -like "*XPS*" -or
+                 $device.Name -like "*PDF*" -or
+                 $device.Name -like "*Dock*" -or
+                 $device.Name -like "*Dell Dock*" -or
+                 $device.Name -like "*WD19S*" -or
+                 $device.Name -like "*Docking*" -or
+                 $device.Name -like "*Port Replicator*" -or
+                 $device.Name -like "*Dell Dock WD19S*")
+            ) {
                 continue
             }
             
             # Look for printer devices (exclude Dell Dock and other non-printer devices)
-            if (($device.Name -like "*printer*" -or 
+            if (
+                ($device.Name -like "*printer*" -or 
                 $device.Name -like "*print*" -or
                 $device.Name -like "*HP*" -or
                 $device.Name -like "*Canon*" -or
@@ -135,7 +153,9 @@ function Get-PrinterInfoFast {
                 $device.Name -like "*Fuji*") -and
                 $device.Name -notlike "*Dock*" -and
                 $device.Name -notlike "*Dell Dock*" -and
-                $device.Name -notlike "*WD19S*") {
+                $device.Name -notlike "*WD19S*" -and
+                $device.Name -notlike "*Dell Dock WD19S*"
+            ) {
                 
                 $deviceInfo = [PSCustomObject]@{
                     Name = $device.Name
@@ -154,7 +174,7 @@ function Get-PrinterInfoFast {
                 }
                 
                 # Extract serial number and manufacturer info from device ID
-                if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                     $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
@@ -213,7 +233,7 @@ function Get-PrinterQueueFast {
                                   Where-Object { $_.DeviceID -like "*USB*" -and $_.Name -like "*Epson*" }
                     
                     foreach ($usbDevice in $usbDevices) {
-                        if ($usbDevice.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                        if ($usbDevice.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                             $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                             $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                             break
