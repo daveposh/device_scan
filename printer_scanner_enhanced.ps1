@@ -171,34 +171,10 @@ function Get-PrinterInfoDeviceManager {
                 
                 # Extract serial number and manufacturer info from device ID
                 if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                    $deviceInfo.SerialNumber = $matches[3]
+                    $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                }
-                # Also check for hex-encoded serial numbers in device ID
-                elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
-                    $hexSerial = $matches[3]
-                    $deviceInfo.SerialNumber = $hexSerial
-                    $deviceInfo.VID = $matches[1]
-                    $deviceInfo.PID = $matches[2]
-                    $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                    
-                    # Use enhanced hex decoding function
-                    try {
-                        if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
-                            $bytes = @()
-                            for ($i = 0; $i -lt $hexSerial.Length; $i += 2) {
-                                $bytes += [Convert]::ToByte($hexSerial.Substring($i, 2), 16)
-                            }
-                            $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
-                            if ($decodedSerial -match '^[A-Za-z0-9\-_]+$') {
-                                $deviceInfo.SerialNumber = "$hexSerial (Decoded: $decodedSerial)"
-                            }
-                        }
-                    } catch {
-                        # Keep original hex serial if decoding fails
-                    }
                 }
                 
                 $printerDevices += $deviceInfo
@@ -342,34 +318,10 @@ function Get-PrinterInfoDeviceManager {
                         
                         # Extract serial number and manufacturer info from device ID
                         if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                            $deviceInfo.SerialNumber = $matches[3]
+                            $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                             $deviceInfo.VID = $matches[1]
                             $deviceInfo.PID = $matches[2]
                             $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                        }
-                        # Also check for hex-encoded serial numbers in device ID
-                        elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
-                            $hexSerial = $matches[3]
-                            $deviceInfo.SerialNumber = $hexSerial
-                            $deviceInfo.VID = $matches[1]
-                            $deviceInfo.PID = $matches[2]
-                            $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                            
-                            # Use enhanced hex decoding function
-                            try {
-                                if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
-                                    $bytes = @()
-                                    for ($i = 0; $i -lt $hexSerial.Length; $i += 2) {
-                                        $bytes += [Convert]::ToByte($hexSerial.Substring($i, 2), 16)
-                                    }
-                                    $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
-                                    if ($decodedSerial -match '^[A-Za-z0-9\-_]+$') {
-                                        $deviceInfo.SerialNumber = "$hexSerial (Decoded: $decodedSerial)"
-                                    }
-                                }
-                            } catch {
-                                # Keep original hex serial if decoding fails
-                            }
                         }
                         
                         $printerDevices += $deviceInfo
@@ -523,34 +475,10 @@ function Get-PrinterInfoDeviceManagerRegistry {
                                     # Extract serial number from device path
                                     $devicePath = $device.PSPath
                                     if ($devicePath -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                                        $deviceInfo.SerialNumber = $matches[3]
+                                        $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                                         $deviceInfo.VID = $matches[1]
                                         $deviceInfo.PID = $matches[2]
                                         $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                                    }
-                                    # Also check for hex-encoded serial numbers in device path
-                                    elseif ($devicePath -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
-                                        $hexSerial = $matches[3]
-                                        $deviceInfo.SerialNumber = $hexSerial
-                                        $deviceInfo.VID = $matches[1]
-                                        $deviceInfo.PID = $matches[2]
-                                        $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                                        
-                                        # Use enhanced hex decoding function
-                                        try {
-                                            if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
-                                                $bytes = @()
-                                                for ($i = 0; $i -lt $hexSerial.Length; $i += 2) {
-                                                    $bytes += [Convert]::ToByte($hexSerial.Substring($i, 2), 16)
-                                                }
-                                                $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
-                                                if ($decodedSerial -match '^[A-Za-z0-9\-_]+$') {
-                                                    $deviceInfo.SerialNumber = "$hexSerial (Decoded: $decodedSerial)"
-                                                }
-                                            }
-                                        } catch {
-                                            # Keep original hex serial if decoding fails
-                                        }
                                     }
                                     
                                     $printerDevices += $deviceInfo
@@ -665,34 +593,10 @@ function Get-USBDeviceInfo {
                 
                 # Extract serial number and manufacturer info from instance ID
                 if ($device.InstanceId -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                    $deviceInfo.SerialNumber = $matches[3]
+                    $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                }
-                # Also check for hex-encoded serial numbers in instance ID
-                elseif ($device.InstanceId -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
-                    $hexSerial = $matches[3]
-                    $deviceInfo.SerialNumber = $hexSerial
-                    $deviceInfo.VID = $matches[1]
-                    $deviceInfo.PID = $matches[2]
-                    $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                    
-                    # Use enhanced hex decoding function
-                    try {
-                        if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
-                            $bytes = @()
-                            for ($i = 0; $i -lt $hexSerial.Length; $i += 2) {
-                                $bytes += [Convert]::ToByte($hexSerial.Substring($i, 2), 16)
-                            }
-                            $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
-                            if ($decodedSerial -match '^[A-Za-z0-9\-_]+$') {
-                                $deviceInfo.SerialNumber = "$hexSerial (Decoded: $decodedSerial)"
-                            }
-                        }
-                    } catch {
-                        # Keep original hex serial if decoding fails
-                    }
                 }
                 
                 $printerDevices += $deviceInfo
@@ -887,7 +791,7 @@ function Get-PrinterQueueDetails {
                             $printer.Name -like "*$($device.Name)*") {
                             
                             if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                                $queueInfo.SerialNumber = $matches[3]
+                                $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                                 $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                             }
                             elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
@@ -955,14 +859,7 @@ function Get-EpsonUSBControllers {
                 
                 # Extract serial number and manufacturer info from device ID
                 if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                    $controllerInfo.SerialNumber = $matches[3]
-                    $controllerInfo.VID = $matches[1]
-                    $controllerInfo.PID = $matches[2]
-                    $controllerInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                }
-                elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
-                    $hexSerial = $matches[3]
-                    $controllerInfo.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
+                    $controllerInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $controllerInfo.VID = $matches[1]
                     $controllerInfo.PID = $matches[2]
                     $controllerInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
@@ -1116,35 +1013,96 @@ function Generate-PrinterOnlyReport {
             $isActualPrinter = $false
             
             # Check if this is an actual printer device
-            if ($printer.Source -like "*PrintQueue*" -or 
-                $printer.Source -like "*Win32_Printer*" -or
-                $printer.Source -like "*PrintManagement*" -or
-                $printer.Source -like "*EpsonUSBController*" -or
-                ($printer.Source -like "*DeviceManager*" -and 
-                 ($printer.Name -like "*Printer*" -or 
-                  $printer.Name -like "*Epson*" -or
-                  $printer.Name -like "*TM*" -or
-                  $printer.Name -like "*Receipt*" -or
-                  $printer.Name -like "*Thermal*" -or
-                  $printer.Name -like "*USB Controller*" -or
-                  $printer.Name -like "*COM*" -or
-                  $printer.Name -like "*Port*"))) {
+            # Exclude Microsoft services and non-printer devices
+            if ($printer.Name -like "*Microsoft*" -or
+                $printer.Name -like "*OneNote*" -or
+                $printer.Name -like "*Fax*" -or
+                $printer.Name -like "*XPS*" -or
+                $printer.Name -like "*PDF*" -or
+                $printer.Name -like "*Composite*" -or
+                $printer.Name -like "*Bus Enumerator*" -or
+                $printer.Name -like "*USB Composite Device*") {
+                $isActualPrinter = $false
+            }
+            # Only include actual printer devices
+            elseif ($printer.Source -like "*PrintQueue*" -and 
+                   ($printer.Name -like "*Epson*" -or
+                    $printer.Name -like "*HP*" -or
+                    $printer.Name -like "*Canon*" -or
+                    $printer.Name -like "*Brother*" -or
+                    $printer.Name -like "*TM*" -or
+                    $printer.Name -like "*Receipt*" -or
+                    $printer.Name -like "*Thermal*" -or
+                    $printer.Name -like "*Printer*")) {
+                $isActualPrinter = $true
+            }
+            elseif ($printer.Source -like "*Win32_Printer*" -and 
+                   ($printer.Name -like "*Epson*" -or
+                    $printer.Name -like "*HP*" -or
+                    $printer.Name -like "*Canon*" -or
+                    $printer.Name -like "*Brother*" -or
+                    $printer.Name -like "*TM*" -or
+                    $printer.Name -like "*Receipt*" -or
+                    $printer.Name -like "*Thermal*" -or
+                    $printer.Name -like "*Printer*")) {
+                $isActualPrinter = $true
+            }
+            elseif ($printer.Source -like "*PrintManagement*" -and 
+                   ($printer.Name -like "*Epson*" -or
+                    $printer.Name -like "*HP*" -or
+                    $printer.Name -like "*Canon*" -or
+                    $printer.Name -like "*Brother*" -or
+                    $printer.Name -like "*TM*" -or
+                    $printer.Name -like "*Receipt*" -or
+                    $printer.Name -like "*Thermal*" -or
+                    $printer.Name -like "*Printer*")) {
+                $isActualPrinter = $true
+            }
+            elseif ($printer.Source -like "*EpsonUSBController*") {
+                $isActualPrinter = $true
+            }
+            elseif ($printer.Source -like "*DeviceManager*" -and 
+                   ($printer.Name -like "*Epson*" -or
+                    $printer.Name -like "*HP*" -or
+                    $printer.Name -like "*Canon*" -or
+                    $printer.Name -like "*Brother*" -or
+                    $printer.Name -like "*TM*" -or
+                    $printer.Name -like "*Receipt*" -or
+                    $printer.Name -like "*Thermal*" -or
+                    $printer.Name -like "*USB Controller*" -or
+                    $printer.Name -like "*COM Emulation*" -or
+                    $printer.Name -like "*COM Port*")) {
                 $isActualPrinter = $true
             }
             
-            # Also include devices with printer-related ports
-            if ($printer.PortName -like "*USB*" -or 
-                $printer.PortName -like "*COM*" -or
-                $printer.PortName -like "*TMUSB*" -or
-                $printer.PortName -like "*LPT*") {
+            # Only include devices with actual printer-related ports (exclude Microsoft services)
+            elseif ($printer.PortName -like "*USB*" -and 
+                   $printer.Name -notlike "*Microsoft*" -and
+                   $printer.Name -notlike "*OneNote*" -and
+                   $printer.Name -notlike "*Fax*" -and
+                   $printer.Name -notlike "*XPS*" -and
+                   $printer.Name -notlike "*PDF*") {
+                $isActualPrinter = $true
+            }
+            elseif ($printer.PortName -like "*COM*" -and 
+                   ($printer.Name -like "*Epson*" -or
+                    $printer.Name -like "*TM*" -or
+                    $printer.Name -like "*Receipt*" -or
+                    $printer.Name -like "*Thermal*")) {
+                $isActualPrinter = $true
+            }
+            elseif ($printer.PortName -like "*TMUSB*" -or $printer.PortName -like "*LPT*") {
                 $isActualPrinter = $true
             }
             
-            # Include devices with printer drivers
-            if ($printer.DriverName -like "*Printer*" -or
-                $printer.DriverName -like "*Epson*" -or
-                $printer.DriverName -like "*TM*" -or
-                $printer.DriverName -like "*Receipt*") {
+            # Only include devices with actual printer drivers (exclude Microsoft services)
+            elseif ($printer.DriverName -like "*Epson*" -or
+                   $printer.DriverName -like "*HP*" -or
+                   $printer.DriverName -like "*Canon*" -or
+                   $printer.DriverName -like "*Brother*" -or
+                   $printer.DriverName -like "*TM*" -or
+                   $printer.DriverName -like "*Receipt*" -or
+                   $printer.DriverName -like "*Thermal*") {
                 $isActualPrinter = $true
             }
             
