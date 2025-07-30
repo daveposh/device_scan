@@ -82,11 +82,13 @@ The scanner attempts to extract the following information for each USB printer:
 - **Model**: Printer model information
 - **Serial Number**: USB device serial number (when available)
 - **Manufacturer**: Manufacturer information (VID/PID when available)
-- **Port Name**: USB port name
+- **Port Name**: USB port name or COM port
 - **Driver Name**: Installed printer driver
 - **Location**: Physical location (if configured)
 - **Status**: Current printer status
 - **Source**: Detection method used
+- **Associated COM Port**: For Epson USB controllers, the virtual COM port created
+- **Associated Printer**: For Epson USB controllers, the printer queue that uses the COM port
 
 ## Detection Methods
 
@@ -110,6 +112,17 @@ The scanner attempts to extract the following information for each USB printer:
 - Provides current printer status
 - Extracts printer properties
 
+### 5. Device Manager (Enhanced)
+- Scans all device categories including "Other devices"
+- Detects USB-to-serial bridge devices
+- Identifies COM port printers
+
+### 6. Epson USB Controller Detection
+- Detects Epson USB controllers (TM/BA/EU series)
+- Identifies associated COM port devices
+- Links USB controllers to printer queues
+- Extracts serial numbers from USB device IDs
+
 ## Serial Number Extraction
 
 The scanner attempts to extract serial numbers using these methods:
@@ -117,6 +130,17 @@ The scanner attempts to extract serial numbers using these methods:
 1. **USB Device ID Parsing**: Extracts serial numbers from USB device instance IDs
 2. **WMI Properties**: Searches WMI device properties for serial numbers
 3. **Registry Values**: Checks registry for stored serial number information
+4. **Hex Decoding**: Decodes hex-encoded serial numbers to human-readable format
+
+### Hex Serial Number Decoding
+
+The scanner includes enhanced hex decoding for serial numbers:
+
+- **Standard ASCII Decoding**: Converts hex to ASCII characters
+- **Epson-Specific Decoding**: Handles Epson's hex encoding format
+  - Example: `5839584C1156290000` → `X9XL115629`
+  - Filters out zero-padding bytes
+  - Validates decoded results
 
 Format: `USB\VID_XXXX&PID_XXXX\SERIALNUMBER`
 

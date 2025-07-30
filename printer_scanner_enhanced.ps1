@@ -18,6 +18,51 @@ function Write-Log {
     Add-Content -Path $OutputPath -Value $logMessage
 }
 
+# Function to decode hex serial numbers (including Epson format)
+function Decode-HexSerial {
+    param([string]$HexSerial)
+    
+    try {
+        if ($HexSerial.Length -ge 8 -and $HexSerial.Length % 2 -eq 0) {
+            # Standard ASCII decoding
+            $bytes = @()
+            for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
+                $bytes += [Convert]::ToByte($HexSerial.Substring($i, 2), 16)
+            }
+            $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
+            
+            # Check if decoded result looks like a valid serial number
+            if ($decodedSerial -match '^[A-Za-z0-9\-_]+$' -and $decodedSerial.Length -gt 0) {
+                return "$HexSerial (Decoded: $decodedSerial)"
+            }
+            
+            # Special handling for Epson-style hex encoding (pairs of hex digits)
+            if ($HexSerial.Length -ge 16 -and $HexSerial.Length % 2 -eq 0) {
+                $epsonDecoded = ""
+                for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
+                    $hexPair = $HexSerial.Substring($i, 2)
+                    $byteValue = [Convert]::ToByte($hexPair, 16)
+                    # Only include non-zero bytes (Epson often pads with zeros)
+                    if ($byteValue -ne 0) {
+                        $epsonDecoded += [char]$byteValue
+                    }
+                }
+                if ($epsonDecoded -match '^[A-Za-z0-9\-_]+$' -and $epsonDecoded.Length -gt 0) {
+                    return "$HexSerial (Epson Decoded: $epsonDecoded)"
+                }
+            }
+            
+            # If no valid decoding found, return original hex
+            return $HexSerial
+        }
+    } catch {
+        # Return original hex if decoding fails
+        return $HexSerial
+    }
+    
+    return $HexSerial
+}
+
 # Function to get printer information from Device Manager via WMI
 function Get-PrinterInfoDeviceManager {
     Write-Log "Getting printer information from Device Manager via WMI..."
@@ -41,10 +86,17 @@ function Get-PrinterInfoDeviceManager {
                 $device.Name -like "*TM-H*" -or
                 $device.Name -like "*TM-L*" -or
                 $device.Name -like "*TM-S*" -or
+                $device.Name -like "*TM-BA*" -or
+                $device.Name -like "*TM-EU*" -or
                 $device.Name -like "*Thermal*" -or
                 $device.Name -like "*Receipt*" -or
                 $device.Name -like "*POS*" -or
                 $device.Name -like "*Point of Sale*" -or
+                $device.Name -like "*USB-to-Serial*" -or
+                $device.Name -like "*USB Serial*" -or
+                $device.Name -like "*USB Controller*" -or
+                $device.Name -like "*Serial Port*" -or
+                $device.Name -like "*COM*" -or
                 $device.Name -like "*Brother*" -or
                 $device.Name -like "*Lexmark*" -or
                 $device.Name -like "*Dell*" -or
@@ -75,9 +127,12 @@ function Get-PrinterInfoDeviceManager {
                 $device.Name -like "*Epson TM-H*" -or
                 $device.Name -like "*Epson TM-L*" -or
                 $device.Name -like "*Epson TM-S*" -or
+                $device.Name -like "*Epson TM-BA*" -or
+                $device.Name -like "*Epson TM-EU*" -or
                 $device.Name -like "*Epson Receipt*" -or
                 $device.Name -like "*Epson Thermal*" -or
                 $device.Name -like "*Epson POS*" -or
+                $device.Name -like "*Epson USB Controller*" -or
                 $device.Name -like "*Brother HL*" -or
                 $device.Name -like "*Brother MFC*" -or
                 $device.Name -like "*Lexmark E*" -or
@@ -129,7 +184,7 @@ function Get-PrinterInfoDeviceManager {
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                     
-                    # Try to decode hex serial number to ASCII if it looks like hex
+                    # Use enhanced hex decoding function
                     try {
                         if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
                             $bytes = @()
@@ -211,7 +266,7 @@ function Get-PrinterInfoDeviceManager {
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                     
-                    # Try to decode hex serial number to ASCII if it looks like hex
+                    # Use enhanced hex decoding function
                     try {
                         if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
                             $bytes = @()
@@ -300,7 +355,7 @@ function Get-PrinterInfoDeviceManager {
                             $deviceInfo.PID = $matches[2]
                             $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                             
-                            # Try to decode hex serial number to ASCII if it looks like hex
+                            # Use enhanced hex decoding function
                             try {
                                 if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
                                     $bytes = @()
@@ -481,7 +536,7 @@ function Get-PrinterInfoDeviceManagerRegistry {
                                         $deviceInfo.PID = $matches[2]
                                         $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                                         
-                                        # Try to decode hex serial number to ASCII if it looks like hex
+                                        # Use enhanced hex decoding function
                                         try {
                                             if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
                                                 $bytes = @()
@@ -623,7 +678,7 @@ function Get-USBDeviceInfo {
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                     
-                    # Try to decode hex serial number to ASCII if it looks like hex
+                    # Use enhanced hex decoding function
                     try {
                         if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
                             $bytes = @()
@@ -715,7 +770,7 @@ function Get-DetailedDeviceInfo {
                         $hexSerial = $matches[3]
                         $device.SerialNumber = $hexSerial
                         
-                        # Try to decode hex serial number to ASCII if it looks like hex
+                        # Use enhanced hex decoding function
                         try {
                             if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
                                 $bytes = @()
@@ -823,16 +878,19 @@ function Get-PrinterQueueDetails {
             }
             
             # Try to extract serial number from port name or other properties
-            if ($printer.PortName -like "*USB*") {
+            if ($printer.PortName -like "*USB*" -or $printer.PortName -like "*COM*") {
                 # Look for serial number in port name
                 if ($printer.PortName -match "USB([0-9]+)") {
                     $queueInfo.SerialNumber = "USB Port $($matches[1])"
+                }
+                elseif ($printer.PortName -match "COM([0-9]+)") {
+                    $queueInfo.SerialNumber = "COM Port $($matches[1])"
                 }
                 
                 # Try to match with device manager devices by port
                 try {
                     $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
-                                  Where-Object { $_.DeviceID -like "*USB*" }
+                                  Where-Object { $_.DeviceID -like "*USB*" -or $_.DeviceID -like "*COM*" }
                     
                     foreach ($device in $usbDevices) {
                         # Try to match by port name or printer name
@@ -846,24 +904,8 @@ function Get-PrinterQueueDetails {
                             }
                             elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
                                 $hexSerial = $matches[3]
-                                $queueInfo.SerialNumber = $hexSerial
+                                $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
                                 $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                                
-                                # Try to decode hex serial number
-                                try {
-                                    if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
-                                        $bytes = @()
-                                        for ($i = 0; $i -lt $hexSerial.Length; $i += 2) {
-                                            $bytes += [Convert]::ToByte($hexSerial.Substring($i, 2), 16)
-                                        }
-                                        $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
-                                        if ($decodedSerial -match '^[A-Za-z0-9\-_]+$') {
-                                            $queueInfo.SerialNumber = "$hexSerial (Decoded: $decodedSerial)"
-                                        }
-                                    }
-                                } catch {
-                                    # Keep original hex serial if decoding fails
-                                }
                             }
                             break
                         }
@@ -880,6 +922,108 @@ function Get-PrinterQueueDetails {
         
     } catch {
         Write-Log "Error getting printer queue details: $($_.Exception.Message)" "ERROR"
+        return @()
+    }
+}
+
+# Function to detect Epson USB controllers and COM port printers
+function Get-EpsonUSBControllers {
+    Write-Log "Detecting Epson USB controllers and COM port printers..."
+    
+    try {
+        $epsonControllers = @()
+        
+        # Get all USB devices that might be Epson controllers
+        $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
+                      Where-Object { $_.DeviceID -like "*USB*" }
+        
+        foreach ($device in $usbDevices) {
+            # Look for Epson USB controllers
+            if ($device.Name -like "*Epson*" -and 
+                ($device.Name -like "*USB*" -or 
+                 $device.Name -like "*Controller*" -or
+                 $device.Name -like "*Serial*" -or
+                 $device.Name -like "*TM*" -or
+                 $device.Name -like "*BA*" -or
+                 $device.Name -like "*EU*")) {
+                
+                $controllerInfo = [PSCustomObject]@{
+                    Name = $device.Name
+                    Model = $device.Name
+                    DeviceID = $device.DeviceID
+                    Manufacturer = $device.Manufacturer
+                    Description = $device.Description
+                    Status = $device.Status
+                    Source = "EpsonUSBController"
+                    SerialNumber = $null
+                    VID = $null
+                    PID = $null
+                    HardwareID = $device.HardwareID
+                    CompatibleID = $device.CompatibleID
+                    Class = $device.PNPClass
+                    AssociatedCOM = $null
+                    AssociatedPrinter = $null
+                }
+                
+                # Extract serial number and manufacturer info from device ID
+                if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                    $controllerInfo.SerialNumber = $matches[3]
+                    $controllerInfo.VID = $matches[1]
+                    $controllerInfo.PID = $matches[2]
+                    $controllerInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
+                }
+                elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
+                    $hexSerial = $matches[3]
+                    $controllerInfo.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
+                    $controllerInfo.VID = $matches[1]
+                    $controllerInfo.PID = $matches[2]
+                    $controllerInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
+                }
+                
+                # Try to find associated COM port
+                try {
+                    $comDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
+                                  Where-Object { $_.DeviceID -like "*COM*" -or $_.Name -like "*COM*" }
+                    
+                    foreach ($comDevice in $comDevices) {
+                        # Check if this COM device might be associated with the Epson controller
+                        if ($comDevice.Name -like "*Epson*" -or 
+                            $comDevice.Name -like "*TM*" -or
+                            $comDevice.Name -like "*Serial*" -or
+                            $comDevice.DeviceID -like "*$($controllerInfo.SerialNumber)*") {
+                            $controllerInfo.AssociatedCOM = $comDevice.Name
+                            break
+                        }
+                    }
+                } catch {
+                    # Continue if COM port detection fails
+                }
+                
+                # Try to find associated printer queue
+                try {
+                    $printers = Get-Printer -ErrorAction SilentlyContinue
+                    foreach ($printer in $printers) {
+                        if ($printer.PortName -like "*COM*" -and 
+                            ($printer.Name -like "*Epson*" -or 
+                             $printer.Name -like "*TM*" -or
+                             $printer.Name -like "*Receipt*" -or
+                             $printer.Name -like "*Thermal*")) {
+                            $controllerInfo.AssociatedPrinter = $printer.Name
+                            break
+                        }
+                    }
+                } catch {
+                    # Continue if printer queue detection fails
+                }
+                
+                $epsonControllers += $controllerInfo
+            }
+        }
+        
+        return $epsonControllers
+        
+    } catch {
+        Write-Log "Error detecting Epson USB controllers: $($_.Exception.Message)" "ERROR"
         return @()
     }
 }
@@ -995,6 +1139,11 @@ $printerQueues = Get-PrinterQueueDetails
 $allPrinters += $printerQueues
 Write-Log "Found $($printerQueues.Count) printer queue(s) with details"
 
+# Method 8: Epson USB Controllers and COM Port Printers (NEW)
+$epsonControllers = Get-EpsonUSBControllers
+$allPrinters += $epsonControllers
+Write-Log "Found $($epsonControllers.Count) Epson USB controller(s) with COM port printers"
+
 # Get detailed information
 $detailedPrinters = Get-DetailedDeviceInfo -Devices $allPrinters
 
@@ -1036,6 +1185,12 @@ if ($finalPrinters.Count -eq 0) {
             if ($printer.Published) {
                 Write-Log "  Published: $($printer.Published)"
             }
+            if ($printer.AssociatedCOM) {
+                Write-Log "  Associated COM Port: $($printer.AssociatedCOM)"
+            }
+            if ($printer.AssociatedPrinter) {
+                Write-Log "  Associated Printer: $($printer.AssociatedPrinter)"
+            }
             Write-Log "---"
         
         # Prepare CSV data
@@ -1057,6 +1212,8 @@ if ($finalPrinters.Count -eq 0) {
             PID = $printer.PID
             Shared = $printer.Shared
             Published = $printer.Published
+            AssociatedCOM = $printer.AssociatedCOM
+            AssociatedPrinter = $printer.AssociatedPrinter
             ScanDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         }
         $csvData += $csvRow
