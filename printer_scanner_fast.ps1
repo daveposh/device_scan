@@ -105,7 +105,7 @@ function Get-PrinterInfoFast {
             }
             
             # Look for printer devices (exclude Dell Dock and other non-printer devices)
-            if ($device.Name -like "*printer*" -or 
+            if (($device.Name -like "*printer*" -or 
                 $device.Name -like "*print*" -or
                 $device.Name -like "*HP*" -or
                 $device.Name -like "*Canon*" -or
@@ -135,7 +135,7 @@ function Get-PrinterInfoFast {
                 $device.Name -like "*Fuji*") -and
                 $device.Name -notlike "*Dock*" -and
                 $device.Name -notlike "*Dell Dock*" -and
-                $device.Name -notlike "*WD19S*" {
+                $device.Name -notlike "*WD19S*") {
                 
                 $deviceInfo = [PSCustomObject]@{
                     Name = $device.Name
