@@ -1,0 +1,51 @@
+=== USB/COM Printer Devices Only ===
+Computer: ORLIT20-LT
+Scan Date: 2025-07-30 14:25:46
+
+Found 3 actual USB/COM printer device(s):
+
+=== PRINTER DEVICE ===
+Name: EPSON TM-T88VII Receipt
+Model: EPSON TM-T88VII Receipt
+Serial Number: COM Port 2
+Manufacturer: 
+Port: COM2:
+Driver: EPSON TM-T(180dpi_1) Receipt6
+Location: 
+Status: Unknown
+Source: PrintQueue
+Device ID: EPSON TM-T88VII Receipt
+VID: 
+PID: 
+Queue Name: EPSON TM-T88VII Receipt
+Display Name: EPSON TM-T88VII Receipt
+
+=== PRINTER DEVICE ===
+Name: EPSON COM Emulation USB Port (COM2)
+Model: EPSON COM Emulation USB Port (COM2)
+Serial Number: 
+Manufacturer: EPSON
+Port: 
+Driver: 
+Location: 
+Status: OK
+Source: DeviceManager_Ports
+Device ID: ROOT\PORTS\0000
+VID: 
+PID: 
+
+=== PRINTER DEVICE ===
+Name: EPSON USB Controller for TM/BA/EU Printers
+Model: EPSON USB Controller for TM/BA/EU Printers
+Serial Number: 5839584C1156290000 (Epson Decoded: X9XL115629)
+Manufacturer: EPSON
+Port: 
+Driver: 
+Location: 
+Status: OK
+Source: DeviceManager_WMI, DeviceManager_USBHub, DeviceManager_USB, PnP_USB, EpsonUSBController
+Device ID: USB\VID_04B8&PID_0202\5839584C1156290000
+VID: 04B8
+PID: 0202
+Associated COM Port: COM2
+Associated Printer: EPSON TM-T88VII Receipt 

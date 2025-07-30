@@ -172,6 +172,7 @@ Format: `USB\VID_XXXX&PID_XXXX\SERIALNUMBER`
 
 The scanner creates detailed log files:
 - `printer_scan_results.txt` - Detailed scan log
+- `printer_devices_only.txt` - Clean printer-only report (filtered from noise)
 - `printer_scan_results.csv` - CSV export (when enabled)
 
 ## PDQ Integration

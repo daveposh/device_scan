@@ -253,7 +253,7 @@ function Get-PrinterInfoDeviceManager {
                 
                 # Extract serial number from device ID
                 if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                    $deviceInfo.SerialNumber = $matches[3]
+                    $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
@@ -757,34 +757,22 @@ function Get-DetailedDeviceInfo {
             $wmiDevice = Get-WmiObject -Class Win32_PnPEntity -Filter "Name='$($device.Name)'" -ErrorAction SilentlyContinue
             
             if ($wmiDevice) {
-                $device.Manufacturer = $wmiDevice.Manufacturer
-                $device.Description = $wmiDevice.Description
+                if ($device.PSObject.Properties.Name -contains "Manufacturer") {
+                    $device.Manufacturer = $wmiDevice.Manufacturer
+                }
+                if ($device.PSObject.Properties.Name -contains "Description") {
+                    $device.Description = $wmiDevice.Description
+                }
                 
                 # Try to extract serial number from various properties
-                if (-not $device.SerialNumber) {
+                if ($device.PSObject.Properties.Name -contains "SerialNumber" -and -not $device.SerialNumber) {
                     if ($wmiDevice.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                        $device.SerialNumber = $matches[3]
+                        $device.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     }
                     # Also check for hex-encoded serial numbers
                     elseif ($wmiDevice.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
                         $hexSerial = $matches[3]
-                        $device.SerialNumber = $hexSerial
-                        
-                        # Use enhanced hex decoding function
-                        try {
-                            if ($hexSerial.Length -ge 8 -and $hexSerial.Length % 2 -eq 0) {
-                                $bytes = @()
-                                for ($i = 0; $i -lt $hexSerial.Length; $i += 2) {
-                                    $bytes += [Convert]::ToByte($hexSerial.Substring($i, 2), 16)
-                                }
-                                $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
-                                if ($decodedSerial -match '^[A-Za-z0-9\-_]+$') {
-                                    $device.SerialNumber = "$hexSerial (Decoded: $decodedSerial)"
-                                }
-                            }
-                        } catch {
-                            # Keep original hex serial if decoding fails
-                        }
+                        $device.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
                     }
                 }
             }
@@ -1012,6 +1000,18 @@ function Get-EpsonUSBControllers {
                             break
                         }
                     }
+                    
+                    # Also check for USB port printers that might be using the controller
+                    foreach ($printer in $printers) {
+                        if ($printer.PortName -like "*USB*" -and 
+                            ($printer.Name -like "*Epson*" -or 
+                             $printer.Name -like "*TM*" -or
+                             $printer.Name -like "*Receipt*" -or
+                             $printer.Name -like "*Thermal*")) {
+                            $controllerInfo.AssociatedPrinter = $printer.Name
+                            break
+                        }
+                    }
                 } catch {
                     # Continue if printer queue detection fails
                 }
@@ -1093,6 +1093,116 @@ function Consolidate-PrinterInfo {
     }
     
     return $consolidated.Values
+}
+
+# Function to generate a clean printer-only report
+function Generate-PrinterOnlyReport {
+    param(
+        [array]$AllPrinters,
+        [string]$OutputFile
+    )
+    
+    try {
+        $printerOnlyContent = @()
+        $printerOnlyContent += "=== USB/COM Printer Devices Only ==="
+        $printerOnlyContent += "Computer: $env:COMPUTERNAME"
+        $printerOnlyContent += "Scan Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        $printerOnlyContent += ""
+        
+        # Filter for actual printer devices
+        $actualPrinters = @()
+        
+        foreach ($printer in $AllPrinters) {
+            $isActualPrinter = $false
+            
+            # Check if this is an actual printer device
+            if ($printer.Source -like "*PrintQueue*" -or 
+                $printer.Source -like "*Win32_Printer*" -or
+                $printer.Source -like "*PrintManagement*" -or
+                $printer.Source -like "*EpsonUSBController*" -or
+                ($printer.Source -like "*DeviceManager*" -and 
+                 ($printer.Name -like "*Printer*" -or 
+                  $printer.Name -like "*Epson*" -or
+                  $printer.Name -like "*TM*" -or
+                  $printer.Name -like "*Receipt*" -or
+                  $printer.Name -like "*Thermal*" -or
+                  $printer.Name -like "*USB Controller*" -or
+                  $printer.Name -like "*COM*" -or
+                  $printer.Name -like "*Port*"))) {
+                $isActualPrinter = $true
+            }
+            
+            # Also include devices with printer-related ports
+            if ($printer.PortName -like "*USB*" -or 
+                $printer.PortName -like "*COM*" -or
+                $printer.PortName -like "*TMUSB*" -or
+                $printer.PortName -like "*LPT*") {
+                $isActualPrinter = $true
+            }
+            
+            # Include devices with printer drivers
+            if ($printer.DriverName -like "*Printer*" -or
+                $printer.DriverName -like "*Epson*" -or
+                $printer.DriverName -like "*TM*" -or
+                $printer.DriverName -like "*Receipt*") {
+                $isActualPrinter = $true
+            }
+            
+            if ($isActualPrinter) {
+                $actualPrinters += $printer
+            }
+        }
+        
+        if ($actualPrinters.Count -eq 0) {
+            $printerOnlyContent += "No actual USB/COM printer devices found."
+        } else {
+            $printerOnlyContent += "Found $($actualPrinters.Count) actual USB/COM printer device(s):"
+            $printerOnlyContent += ""
+            
+            foreach ($printer in $actualPrinters) {
+                $printerOnlyContent += "=== PRINTER DEVICE ==="
+                $printerOnlyContent += "Name: $($printer.Name)"
+                $printerOnlyContent += "Model: $($printer.Model)"
+                $printerOnlyContent += "Serial Number: $($printer.SerialNumber)"
+                $printerOnlyContent += "Manufacturer: $($printer.Manufacturer)"
+                $printerOnlyContent += "Port: $($printer.PortName)"
+                $printerOnlyContent += "Driver: $($printer.DriverName)"
+                $printerOnlyContent += "Location: $($printer.Location)"
+                $printerOnlyContent += "Status: $($printer.Status)"
+                $printerOnlyContent += "Source: $($printer.Source)"
+                $printerOnlyContent += "Device ID: $($printer.DeviceID)"
+                $printerOnlyContent += "VID: $($printer.VID)"
+                $printerOnlyContent += "PID: $($printer.PID)"
+                
+                if ($printer.QueueName -and $printer.QueueName -ne $printer.Name) {
+                    $printerOnlyContent += "Queue Name: $($printer.QueueName)"
+                }
+                if ($printer.DisplayName -and $printer.DisplayName -ne $printer.Name) {
+                    $printerOnlyContent += "Display Name: $($printer.DisplayName)"
+                }
+                if ($printer.Shared) {
+                    $printerOnlyContent += "Shared: $($printer.Shared)"
+                }
+                if ($printer.Published) {
+                    $printerOnlyContent += "Published: $($printer.Published)"
+                }
+                if ($printer.AssociatedCOM) {
+                    $printerOnlyContent += "Associated COM Port: $($printer.AssociatedCOM)"
+                }
+                if ($printer.AssociatedPrinter) {
+                    $printerOnlyContent += "Associated Printer: $($printer.AssociatedPrinter)"
+                }
+                $printerOnlyContent += ""
+            }
+        }
+        
+        # Write to file
+        $printerOnlyContent | Out-File -FilePath $OutputFile -Encoding UTF8
+        Write-Log "Printer-only report generated: $OutputFile" "INFO"
+        
+    } catch {
+        Write-Log "Error generating printer-only report: $($_.Exception.Message)" "ERROR"
+    }
 }
 
 # Main execution
@@ -1233,4 +1343,9 @@ if ($finalPrinters.Count -eq 0) {
 }
 
 Write-Log "=== Enhanced USB Printer Scanner Completed ==="
-Write-Log "Results saved to: $OutputPath" 
+Write-Log "Results saved to: $OutputPath"
+
+# Generate clean printer-only report
+$printerOnlyFile = ".\printer_devices_only.txt"
+Generate-PrinterOnlyReport -AllPrinters $finalPrinters -OutputFile $printerOnlyFile
+Write-Log "Printer-only report saved to: $printerOnlyFile" 
