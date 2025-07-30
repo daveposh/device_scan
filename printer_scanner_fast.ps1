@@ -26,7 +26,7 @@ function Decode-HexSerial {
     # Debug: Show ASCII values of each character
     for ($i = 0; $i -lt $HexSerial.Length; $i++) {
         $c = $HexSerial[$i]
-        $ascii = [int][char]$c
+        $ascii = [int]$c
         Write-Log "Char $i: '$c' (ASCII: $ascii)" "DEBUG"
     }
     
