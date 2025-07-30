@@ -24,17 +24,25 @@ function Decode-HexSerial {
     
     try {
         if ($HexSerial.Length -ge 8 -and $HexSerial.Length % 2 -eq 0) {
-            # Special handling for Epson-style hex encoding (pairs of hex digits)
-            if ($HexSerial.Length -ge 16 -and $HexSerial.Length % 2 -eq 0) {
-                $epsonDecoded = ""
-                for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
-                    $hexPair = $HexSerial.Substring($i, 2)
+            # Special handling for Epson-style hex encoding: [8 hex chars][6 numbers][4 zero padding]
+            if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0000)$") {
+                $hexPart = $matches[1]  # First 8 hex characters
+                $numberPart = $matches[2]  # Next 6 numbers
+                $padding = $matches[3]  # Last 4 zeros
+                
+                # Decode the hex part
+                $hexDecoded = ""
+                for ($i = 0; $i -lt $hexPart.Length; $i += 2) {
+                    $hexPair = $hexPart.Substring($i, 2)
                     $byteValue = [Convert]::ToByte($hexPair, 16)
-                    # Only include non-zero bytes and printable characters (Epson often pads with zeros)
-                    if ($byteValue -ne 0 -and $byteValue -ge 32 -and $byteValue -le 126) {
-                        $epsonDecoded += [char]$byteValue
+                    if ($byteValue -ge 32 -and $byteValue -le 126) {
+                        $hexDecoded += [char]$byteValue
                     }
                 }
+                
+                # Combine hex decoded part with number part
+                $epsonDecoded = $hexDecoded + $numberPart
+                
                 if ($epsonDecoded.Length -gt 0) {
                     return "$HexSerial (Epson Decoded: $epsonDecoded)"
                 }
