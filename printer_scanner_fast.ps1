@@ -27,7 +27,7 @@ function Decode-HexSerial {
     for ($i = 0; $i -lt $HexSerial.Length; $i++) {
         $c = $HexSerial[$i]
         $ascii = [int]$c
-        Write-Log "Char $i: '$c' (ASCII: $ascii)" "DEBUG"
+        Write-Log "Char ${i}: '$c' (ASCII: ${ascii})" "DEBUG"
     }
     
     try {
