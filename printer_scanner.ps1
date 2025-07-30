@@ -16,6 +16,41 @@ function Write-Log {
     Add-Content -Path $OutputPath -Value $logMessage
 }
 
+# Function to decode hex serial numbers (including Epson format)
+function Decode-HexSerial {
+    param([string]$HexSerial)
+    
+    try {
+        if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0{4})$") {
+            $hexPart = $matches[1]  # First 8 hex characters
+            $numberPart = $matches[2]  # Next 6 numbers
+            $padding = $matches[3]  # Last 4 zeros
+            
+            # Decode the hex part
+            $hexDecoded = ""
+            for ($i = 0; $i -lt $hexPart.Length; $i += 2) {
+                $hexPair = $hexPart.Substring($i, 2)
+                $byteValue = [Convert]::ToByte($hexPair, 16)
+                if ($byteValue -ge 32 -and $byteValue -le 126) {
+                    $hexDecoded += [char]$byteValue
+                }
+            }
+            
+            # Combine hex decoded part with number part
+            $epsonDecoded = $hexDecoded + $numberPart
+            
+            if ($epsonDecoded.Length -gt 0) {
+                return "$HexSerial (Epson Decoded: $epsonDecoded)"
+            }
+        }
+        
+        # If no Epson pattern found, return original
+        return $HexSerial
+    } catch {
+        return $HexSerial
+    }
+}
+
 # Function to get USB printer information using WMI
 function Get-USBPrinterInfo {
     Write-Log "Starting USB printer scan..."
@@ -32,13 +67,83 @@ function Get-USBPrinterInfo {
         
         # Get PnP devices that might be printers
         $pnpDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
-                      Where-Object { $_.Name -like "*printer*" -or $_.Name -like "*print*" }
+                      Where-Object { 
+                          # Exclude non-printer devices
+                          $_.Name -notlike "*Fingerprint*" -and
+                          $_.Name -notlike "*Scanner*" -and
+                          $_.Name -notlike "*Camera*" -and
+                          $_.Name -notlike "*Webcam*" -and
+                          $_.Name -notlike "*Microphone*" -and
+                          $_.Name -notlike "*Audio*" -and
+                          $_.Name -notlike "*Speaker*" -and
+                          $_.Name -notlike "*Headset*" -and
+                          $_.Name -notlike "*Mouse*" -and
+                          $_.Name -notlike "*Keyboard*" -and
+                          $_.Name -notlike "*Touchpad*" -and
+                          $_.Name -notlike "*Trackpad*" -and
+                          $_.Name -notlike "*Monitor*" -and
+                          $_.Name -notlike "*Display*" -and
+                          $_.Name -notlike "*Graphics*" -and
+                          $_.Name -notlike "*Video*" -and
+                          $_.Name -notlike "*Network*" -and
+                          $_.Name -notlike "*Ethernet*" -and
+                          $_.Name -notlike "*WiFi*" -and
+                          $_.Name -notlike "*Wireless*" -and
+                          $_.Name -notlike "*Bluetooth*" -and
+                          $_.Name -notlike "*Card Reader*" -and
+                          $_.Name -notlike "*Smart Card*" -and
+                          $_.Name -notlike "*USB Hub*" -and
+                          $_.Name -notlike "*USB Root*" -and
+                          $_.Name -notlike "*Composite*" -and
+                          $_.Name -notlike "*Bus Enumerator*" -and
+                          $_.Name -notlike "*Microsoft*" -and
+                          $_.Name -notlike "*OneNote*" -and
+                          $_.Name -notlike "*Fax*" -and
+                          $_.Name -notlike "*XPS*" -and
+                          $_.Name -notlike "*PDF*" -and
+                          # Include printer devices
+                          ($_.Name -like "*printer*" -or 
+                           $_.Name -like "*print*" -or
+                           $_.Name -like "*HP*" -or
+                           $_.Name -like "*Canon*" -or
+                           $_.Name -like "*Epson*" -or
+                           $_.Name -like "*TM*" -or
+                           $_.Name -like "*Thermal*" -or
+                           $_.Name -like "*Receipt*" -or
+                           $_.Name -like "*POS*" -or
+                           $_.Name -like "*Point of Sale*" -or
+                           $_.Name -like "*USB-to-Serial*" -or
+                           $_.Name -like "*USB Serial*" -or
+                           $_.Name -like "*USB Controller*" -or
+                           $_.Name -like "*Serial Port*" -or
+                           $_.Name -like "*COM*" -or
+                           $_.Name -like "*Brother*" -or
+                           $_.Name -like "*Lexmark*" -or
+                           $_.Name -like "*Dell*" -or
+                           $_.Name -like "*Xerox*" -or
+                           $_.Name -like "*Samsung*" -or
+                           $_.Name -like "*Ricoh*" -or
+                           $_.Name -like "*Kyocera*" -or
+                           $_.Name -like "*Sharp*" -or
+                           $_.Name -like "*Konica*" -or
+                           $_.Name -like "*Minolta*" -or
+                           $_.Name -like "*OKI*" -or
+                           $_.Name -like "*Toshiba*" -or
+                           $_.Name -like "*Panasonic*" -or
+                           $_.Name -like "*Fuji*")
+                      }
         
         $printerResults = @()
         
         # Method 1: Check printers that are connected via USB
         foreach ($printer in $printers) {
-            if ($printer.PortName -like "*USB*" -or $printer.PortName -like "*USBPRN*") {
+            # Exclude Microsoft services
+            if ($printer.Name -notlike "*Microsoft*" -and
+                $printer.Name -notlike "*OneNote*" -and
+                $printer.Name -notlike "*Fax*" -and
+                $printer.Name -notlike "*XPS*" -and
+                $printer.Name -notlike "*PDF*" -and
+                ($printer.PortName -like "*USB*" -or $printer.PortName -like "*USBPRN*")) {
                 $printerInfo = [PSCustomObject]@{
                     Name = $printer.Name
                     PortName = $printer.PortName
@@ -123,7 +228,7 @@ function Get-PrinterDetails {
             if ($printer.DeviceID) {
                 # Extract serial number from device ID if present
                 if ($printer.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                    $details.SerialNumber = $matches[3]
+                    $details.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $details.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                 }
             }
@@ -158,7 +263,72 @@ function Get-USBDeviceSerialNumbers {
     
     try {
         # Try using PowerShell to get USB device information
-        $usbDevices = Get-PnpDevice -Class USB -ErrorAction SilentlyContinue
+        $usbDevices = Get-PnpDevice -Class USB -ErrorAction SilentlyContinue | 
+                      Where-Object { 
+                          # Exclude non-printer devices
+                          $_.FriendlyName -notlike "*Fingerprint*" -and
+                          $_.FriendlyName -notlike "*Scanner*" -and
+                          $_.FriendlyName -notlike "*Camera*" -and
+                          $_.FriendlyName -notlike "*Webcam*" -and
+                          $_.FriendlyName -notlike "*Microphone*" -and
+                          $_.FriendlyName -notlike "*Audio*" -and
+                          $_.FriendlyName -notlike "*Speaker*" -and
+                          $_.FriendlyName -notlike "*Headset*" -and
+                          $_.FriendlyName -notlike "*Mouse*" -and
+                          $_.FriendlyName -notlike "*Keyboard*" -and
+                          $_.FriendlyName -notlike "*Touchpad*" -and
+                          $_.FriendlyName -notlike "*Trackpad*" -and
+                          $_.FriendlyName -notlike "*Monitor*" -and
+                          $_.FriendlyName -notlike "*Display*" -and
+                          $_.FriendlyName -notlike "*Graphics*" -and
+                          $_.FriendlyName -notlike "*Video*" -and
+                          $_.FriendlyName -notlike "*Network*" -and
+                          $_.FriendlyName -notlike "*Ethernet*" -and
+                          $_.FriendlyName -notlike "*WiFi*" -and
+                          $_.FriendlyName -notlike "*Wireless*" -and
+                          $_.FriendlyName -notlike "*Bluetooth*" -and
+                          $_.FriendlyName -notlike "*Card Reader*" -and
+                          $_.FriendlyName -notlike "*Smart Card*" -and
+                          $_.FriendlyName -notlike "*USB Hub*" -and
+                          $_.FriendlyName -notlike "*USB Root*" -and
+                          $_.FriendlyName -notlike "*Composite*" -and
+                          $_.FriendlyName -notlike "*Bus Enumerator*" -and
+                          $_.FriendlyName -notlike "*Microsoft*" -and
+                          $_.FriendlyName -notlike "*OneNote*" -and
+                          $_.FriendlyName -notlike "*Fax*" -and
+                          $_.FriendlyName -notlike "*XPS*" -and
+                          $_.FriendlyName -notlike "*PDF*" -and
+                          # Include printer devices
+                          ($_.FriendlyName -like "*printer*" -or 
+                           $_.FriendlyName -like "*print*" -or
+                           $_.FriendlyName -like "*HP*" -or
+                           $_.FriendlyName -like "*Canon*" -or
+                           $_.FriendlyName -like "*Epson*" -or
+                           $_.FriendlyName -like "*TM*" -or
+                           $_.FriendlyName -like "*Thermal*" -or
+                           $_.FriendlyName -like "*Receipt*" -or
+                           $_.FriendlyName -like "*POS*" -or
+                           $_.FriendlyName -like "*Point of Sale*" -or
+                           $_.FriendlyName -like "*USB-to-Serial*" -or
+                           $_.FriendlyName -like "*USB Serial*" -or
+                           $_.FriendlyName -like "*USB Controller*" -or
+                           $_.FriendlyName -like "*Serial Port*" -or
+                           $_.FriendlyName -like "*COM*" -or
+                           $_.FriendlyName -like "*Brother*" -or
+                           $_.FriendlyName -like "*Lexmark*" -or
+                           $_.FriendlyName -like "*Dell*" -or
+                           $_.FriendlyName -like "*Xerox*" -or
+                           $_.FriendlyName -like "*Samsung*" -or
+                           $_.FriendlyName -like "*Ricoh*" -or
+                           $_.FriendlyName -like "*Kyocera*" -or
+                           $_.FriendlyName -like "*Sharp*" -or
+                           $_.FriendlyName -like "*Konica*" -or
+                           $_.FriendlyName -like "*Minolta*" -or
+                           $_.FriendlyName -like "*OKI*" -or
+                           $_.FriendlyName -like "*Toshiba*" -or
+                           $_.FriendlyName -like "*Panasonic*" -or
+                           $_.FriendlyName -like "*Fuji*")
+                      }
         
         foreach ($device in $usbDevices) {
             $deviceInfo = [PSCustomObject]@{
@@ -170,7 +340,7 @@ function Get-USBDeviceSerialNumbers {
             
             # Extract serial number from instance ID if possible
             if ($device.InstanceId -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
-                $deviceInfo.SerialNumber = $matches[3]
+                $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                 $deviceInfo.VID = $matches[1]
                 $deviceInfo.PID = $matches[2]
             }

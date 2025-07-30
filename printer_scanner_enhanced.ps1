@@ -25,7 +25,7 @@ function Decode-HexSerial {
     try {
         if ($HexSerial.Length -ge 8 -and $HexSerial.Length % 2 -eq 0) {
             # Special handling for Epson-style hex encoding: [8 hex chars][6 numbers][4 zero padding]
-            if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0000)$") {
+            if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0{4})$") {
                 $hexPart = $matches[1]  # First 8 hex characters
                 $numberPart = $matches[2]  # Next 6 numbers
                 $padding = $matches[3]  # Last 4 zeros
@@ -82,6 +82,44 @@ function Get-PrinterInfoDeviceManager {
         $pnpDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue
         
         foreach ($device in $pnpDevices) {
+            # Exclude non-printer devices first
+            if ($device.Name -like "*Fingerprint*" -or
+                $device.Name -like "*Scanner*" -or
+                $device.Name -like "*Camera*" -or
+                $device.Name -like "*Webcam*" -or
+                $device.Name -like "*Microphone*" -or
+                $device.Name -like "*Audio*" -or
+                $device.Name -like "*Speaker*" -or
+                $device.Name -like "*Headset*" -or
+                $device.Name -like "*Mouse*" -or
+                $device.Name -like "*Keyboard*" -or
+                $device.Name -like "*Touchpad*" -or
+                $device.Name -like "*Trackpad*" -or
+                $device.Name -like "*Monitor*" -or
+                $device.Name -like "*Display*" -or
+                $device.Name -like "*Graphics*" -or
+                $device.Name -like "*Video*" -or
+                $device.Name -like "*Network*" -or
+                $device.Name -like "*Ethernet*" -or
+                $device.Name -like "*WiFi*" -or
+                $device.Name -like "*Wireless*" -or
+                $device.Name -like "*Bluetooth*" -or
+                $device.Name -like "*Card Reader*" -or
+                $device.Name -like "*Smart Card*" -or
+                $device.Name -like "*USB Hub*" -or
+                $device.Name -like "*USB Root*" -or
+                $device.Name -like "*USB Controller*" -and $device.Name -notlike "*Epson*" -or
+                $device.Name -like "*Composite*" -or
+                $device.Name -like "*Bus Enumerator*" -or
+                $device.Name -like "*Microsoft*" -or
+                $device.Name -like "*OneNote*" -or
+                $device.Name -like "*Fax*" -or
+                $device.Name -like "*XPS*" -or
+                $device.Name -like "*PDF*") {
+                # Skip this device - it's not a printer
+                continue
+            }
+            
             # Look for printer devices in ALL Device Manager categories
             if ($device.Name -like "*printer*" -or 
                 $device.Name -like "*print*" -or
@@ -1029,7 +1067,33 @@ function Generate-PrinterOnlyReport {
                 $printer.Name -like "*PDF*" -or
                 $printer.Name -like "*Composite*" -or
                 $printer.Name -like "*Bus Enumerator*" -or
-                $printer.Name -like "*USB Composite Device*") {
+                $printer.Name -like "*USB Composite Device*" -or
+                $printer.Name -like "*Fingerprint*" -or
+                $printer.Name -like "*Scanner*" -or
+                $printer.Name -like "*Camera*" -or
+                $printer.Name -like "*Webcam*" -or
+                $printer.Name -like "*Microphone*" -or
+                $printer.Name -like "*Audio*" -or
+                $printer.Name -like "*Speaker*" -or
+                $printer.Name -like "*Headset*" -or
+                $printer.Name -like "*Mouse*" -or
+                $printer.Name -like "*Keyboard*" -or
+                $printer.Name -like "*Touchpad*" -or
+                $printer.Name -like "*Trackpad*" -or
+                $printer.Name -like "*Monitor*" -or
+                $printer.Name -like "*Display*" -or
+                $printer.Name -like "*Graphics*" -or
+                $printer.Name -like "*Video*" -or
+                $printer.Name -like "*Network*" -or
+                $printer.Name -like "*Ethernet*" -or
+                $printer.Name -like "*WiFi*" -or
+                $printer.Name -like "*Wireless*" -or
+                $printer.Name -like "*Bluetooth*" -or
+                $printer.Name -like "*Card Reader*" -or
+                $printer.Name -like "*Smart Card*" -or
+                $printer.Name -like "*USB Hub*" -or
+                $printer.Name -like "*USB Root*" -or
+                $printer.Name -like "*USB Controller*" -and $printer.Name -notlike "*Epson*") {
                 $isActualPrinter = $false
             }
             # Only include actual printer devices
