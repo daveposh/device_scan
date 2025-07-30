@@ -20,8 +20,11 @@ function Write-Log {
 function Decode-HexSerial {
     param([string]$HexSerial)
     
+    Write-Log "Decoding serial: $HexSerial" "DEBUG"
+    
     try {
         if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-Fa-f0-9]{8})([0-9]{6})(0{4})$") {
+            Write-Log "Epson pattern matched for: $HexSerial" "DEBUG"
             $hexPart = $matches[1]  # First 8 hex characters
             $numberPart = $matches[2]  # Next 6 numbers
             $padding = $matches[3]  # Last 4 zeros
@@ -31,18 +34,26 @@ function Decode-HexSerial {
             for ($i = 0; $i -lt $hexPart.Length; $i += 2) {
                 $hexPair = $hexPart.Substring($i, 2)
                 $byteValue = [Convert]::ToByte($hexPair, 16)
+                Write-Log "  Decoding $hexPair = $byteValue = '$([char]$byteValue)'" "DEBUG"
                 # Allow all printable ASCII characters (32-126) and some control chars
                 if ($byteValue -ge 32 -and $byteValue -le 126) {
                     $hexDecoded += [char]$byteValue
+                    Write-Log "  Added character: '$([char]$byteValue)'" "DEBUG"
+                } else {
+                    Write-Log "  Skipped character (out of range): $byteValue" "DEBUG"
                 }
             }
             
             # Combine hex decoded part with number part
             $epsonDecoded = $hexDecoded + $numberPart
             
+            Write-Log "Epson decoded result: $epsonDecoded" "DEBUG"
+            
             if ($epsonDecoded.Length -gt 0) {
                 return "$HexSerial (Epson Decoded: $epsonDecoded)"
             }
+        } else {
+            Write-Log "Epson pattern NOT matched for: $HexSerial" "DEBUG"
         }
         
         # Standard ASCII decoding (try this after Epson-specific decoding)
