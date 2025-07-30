@@ -31,7 +31,7 @@ function Decode-HexSerial {
     }
     
     try {
-        if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-Fa-f0-9]{8})([0-9]{6})(0{4})$") {
+        if ($HexSerial.Length -eq 18 -and $HexSerial -match "^([A-Fa-f0-9]{8})([0-9]{6})(0{4})$") {
             Write-Log "Epson pattern matched for: $HexSerial" "DEBUG"
             $hexPart = $matches[1]  # First 8 hex characters
             $numberPart = $matches[2]  # Next 6 numbers
