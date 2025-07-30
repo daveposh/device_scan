@@ -100,7 +100,12 @@ function Get-USBPrinterInfo {
                           $_.Name -notlike "*OneNote*" -and
                           $_.Name -notlike "*Fax*" -and
                           $_.Name -notlike "*XPS*" -and
-                          $_.Name -notlike "*PDF*" -and
+                                                     $_.Name -notlike "*PDF*" -and
+                           $_.Name -notlike "*Dock*" -and
+                           $_.Name -notlike "*Dell Dock*" -and
+                           $_.Name -notlike "*WD19S*" -and
+                           $_.Name -notlike "*Docking*" -and
+                           $_.Name -notlike "*Port Replicator*" -and
                           # Include printer devices
                           ($_.Name -like "*printer*" -or 
                            $_.Name -like "*print*" -or
@@ -119,7 +124,7 @@ function Get-USBPrinterInfo {
                            $_.Name -like "*COM*" -or
                            $_.Name -like "*Brother*" -or
                            $_.Name -like "*Lexmark*" -or
-                           $_.Name -like "*Dell*" -or
+                           $_.Name -like "*Dell*" -and $_.Name -notlike "*Dock*" -and $_.Name -notlike "*WD19S*" -or
                            $_.Name -like "*Xerox*" -or
                            $_.Name -like "*Samsung*" -or
                            $_.Name -like "*Ricoh*" -or
@@ -297,7 +302,12 @@ function Get-USBDeviceSerialNumbers {
                           $_.FriendlyName -notlike "*OneNote*" -and
                           $_.FriendlyName -notlike "*Fax*" -and
                           $_.FriendlyName -notlike "*XPS*" -and
-                          $_.FriendlyName -notlike "*PDF*" -and
+                                                     $_.FriendlyName -notlike "*PDF*" -and
+                           $_.FriendlyName -notlike "*Dock*" -and
+                           $_.FriendlyName -notlike "*Dell Dock*" -and
+                           $_.FriendlyName -notlike "*WD19S*" -and
+                           $_.FriendlyName -notlike "*Docking*" -and
+                           $_.FriendlyName -notlike "*Port Replicator*" -and
                           # Include printer devices
                           ($_.FriendlyName -like "*printer*" -or 
                            $_.FriendlyName -like "*print*" -or

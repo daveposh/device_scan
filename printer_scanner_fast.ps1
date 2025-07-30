@@ -95,11 +95,16 @@ function Get-PrinterInfoFast {
                 $device.Name -like "*OneNote*" -or
                 $device.Name -like "*Fax*" -or
                 $device.Name -like "*XPS*" -or
-                $device.Name -like "*PDF*") {
+                $device.Name -like "*PDF*" -or
+                $device.Name -like "*Dock*" -or
+                $device.Name -like "*Dell Dock*" -or
+                $device.Name -like "*WD19S*" -or
+                $device.Name -like "*Docking*" -or
+                $device.Name -like "*Port Replicator*") {
                 continue
             }
             
-            # Look for printer devices
+            # Look for printer devices (exclude Dell Dock and other non-printer devices)
             if ($device.Name -like "*printer*" -or 
                 $device.Name -like "*print*" -or
                 $device.Name -like "*HP*" -or
@@ -117,7 +122,6 @@ function Get-PrinterInfoFast {
                 $device.Name -like "*COM*" -or
                 $device.Name -like "*Brother*" -or
                 $device.Name -like "*Lexmark*" -or
-                $device.Name -like "*Dell*" -or
                 $device.Name -like "*Xerox*" -or
                 $device.Name -like "*Samsung*" -or
                 $device.Name -like "*Ricoh*" -or
@@ -128,7 +132,10 @@ function Get-PrinterInfoFast {
                 $device.Name -like "*OKI*" -or
                 $device.Name -like "*Toshiba*" -or
                 $device.Name -like "*Panasonic*" -or
-                $device.Name -like "*Fuji*") {
+                $device.Name -like "*Fuji*") -and
+                $device.Name -notlike "*Dock*" -and
+                $device.Name -notlike "*Dell Dock*" -and
+                $device.Name -notlike "*WD19S*" {
                 
                 $deviceInfo = [PSCustomObject]@{
                     Name = $device.Name
@@ -198,6 +205,22 @@ function Get-PrinterQueueFast {
                     DisplayName = $printer.Name
                     Shared = $printer.Shared
                     Published = $printer.Published
+                }
+                
+                # Try to link with USB controller to get serial number
+                try {
+                    $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
+                                  Where-Object { $_.DeviceID -like "*USB*" -and $_.Name -like "*Epson*" }
+                    
+                    foreach ($usbDevice in $usbDevices) {
+                        if ($usbDevice.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                            $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
+                            $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
+                            break
+                        }
+                    }
+                } catch {
+                    # Continue if linking fails
                 }
                 
                 $printerQueues += $queueInfo
