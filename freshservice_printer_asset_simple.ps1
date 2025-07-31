@@ -21,9 +21,9 @@ function Write-Log {
 # Import the printer scanner functions
 try {
     . .\printer_scanner_enhanced.ps1
-    Write-Log "✅ Successfully imported printer scanner functions"
+    Write-Log "SUCCESS: Successfully imported printer scanner functions"
 } catch {
-    Write-Log "⚠️ Could not import printer scanner, using built-in functions"
+    Write-Log "WARNING: Could not import printer scanner, using built-in functions"
 }
 
 function Load-Configuration {
@@ -31,17 +31,17 @@ function Load-Configuration {
     
     try {
         if (-not (Test-Path $ConfigPath)) {
-            Write-Log "❌ Configuration file not found: $ConfigPath"
+            Write-Log "ERROR: Configuration file not found: $ConfigPath"
             Write-Log "Please create $ConfigPath with your Freshservice settings"
             return $null
         }
         
         $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
-        Write-Log "✅ Configuration loaded from $ConfigPath"
+        Write-Log "SUCCESS: Configuration loaded from $ConfigPath"
         return $config
     }
     catch {
-        Write-Log "❌ Failed to load configuration: $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to load configuration: $($_.Exception.Message)"
         return $null
     }
 }
@@ -57,11 +57,11 @@ function Test-FreshserviceConnection {
     
     try {
         $response = Invoke-RestMethod -Uri "$BaseUrl/assets" -Headers $Headers -Method Get -ErrorAction Stop
-        Write-Log "✅ Successfully connected to Freshservice API"
+        Write-Log "SUCCESS: Successfully connected to Freshservice API"
         return @{ BaseUrl = $BaseUrl; Headers = $Headers }
     }
     catch {
-        Write-Log "❌ Failed to connect to Freshservice API: $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to connect to Freshservice API: $($_.Exception.Message)"
         return $null
     }
 }
@@ -71,11 +71,11 @@ function Get-FreshserviceAssetTypes {
     
     try {
         $response = Invoke-RestMethod -Uri "$($ApiConfig.BaseUrl)/asset_types" -Headers $ApiConfig.Headers -Method Get -ErrorAction Stop
-        Write-Log "✅ Retrieved $($response.asset_types.Count) asset types from Freshservice"
+        Write-Log "SUCCESS: Retrieved $($response.asset_types.Count) asset types from Freshservice"
         return $response.asset_types
     }
     catch {
-        Write-Log "❌ Failed to get asset types: $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to get asset types: $($_.Exception.Message)"
         return @()
     }
 }
@@ -127,7 +127,7 @@ function Find-ExistingAsset {
         return $null
     }
     catch {
-        Write-Log "⚠️ Error searching for existing asset: $($_.Exception.Message)"
+        Write-Log "WARNING: Error searching for existing asset: $($_.Exception.Message)"
         return $null
     }
 }
@@ -157,7 +157,7 @@ function Find-ComputerAsset {
         return $null
     }
     catch {
-        Write-Log "⚠️ Error searching for computer asset: $($_.Exception.Message)"
+        Write-Log "WARNING: Error searching for computer asset: $($_.Exception.Message)"
         return $null
     }
 }
@@ -224,7 +224,7 @@ function Get-PrinterInfoSimple {
         return $printers
     }
     catch {
-        Write-Log "❌ Error in simple printer scanning: $($_.Exception.Message)"
+        Write-Log "ERROR: Error in simple printer scanning: $($_.Exception.Message)"
         return @()
     }
 }
@@ -240,16 +240,16 @@ function New-FreshserviceAsset {
         # Check if asset already exists
         $existingAsset = Find-ExistingAsset -ApiConfig $ApiConfig -SerialNumber $Printer.SerialNumber -Name $Printer.Name
         if ($existingAsset) {
-            Write-Log "⚠️ Asset already exists: $($existingAsset.display_id) - $($existingAsset.name)"
+            Write-Log "WARNING: Asset already exists: $($existingAsset.display_id) - $($existingAsset.name)"
             return $existingAsset
         }
         
         # Find the computer asset to associate with
         $computerAsset = Find-ComputerAsset -ApiConfig $ApiConfig -Hostname $env:COMPUTERNAME
         if ($computerAsset) {
-            Write-Log "🖥️ Found computer asset: $($computerAsset.display_id) - $($computerAsset.name)"
+            Write-Log "Found computer asset: $($computerAsset.display_id) - $($computerAsset.name)"
         } else {
-            Write-Log "⚠️ Computer asset not found for hostname: $env:COMPUTERNAME"
+            Write-Log "WARNING: Computer asset not found for hostname: $env:COMPUTERNAME"
         }
         
         # Get asset type ID based on printer
@@ -294,7 +294,7 @@ function New-FreshserviceAsset {
         }
         
         if ($DryRun) {
-            Write-Log "🔍 DRY RUN: Would create $assetTypeName asset for $($Printer.Name)"
+            Write-Log "DRY RUN: Would create $assetTypeName asset for $($Printer.Name)"
             Write-Log "   Asset Type ID: $assetTypeId"
             if ($computerAsset) {
                 Write-Log "   Associated with computer: $($computerAsset.name) (ID: $($computerAsset.id))"
@@ -306,7 +306,7 @@ function New-FreshserviceAsset {
         $body = $assetData | ConvertTo-Json -Depth 3
         $response = Invoke-RestMethod -Uri "$($ApiConfig.BaseUrl)/assets" -Headers $ApiConfig.Headers -Method Post -Body $body -ErrorAction Stop
         
-        Write-Log "✅ Successfully created asset: $($response.asset.display_id) - $($response.asset.name) (Type: $assetTypeName)"
+        Write-Log "SUCCESS: Successfully created asset: $($response.asset.display_id) - $($response.asset.name) (Type: $assetTypeName)"
         if ($computerAsset) {
             Write-Log "   Associated with computer: $($computerAsset.name)"
         }
@@ -314,39 +314,39 @@ function New-FreshserviceAsset {
         
     }
     catch {
-        Write-Log "❌ Failed to create asset for $($Printer.Name): $($_.Exception.Message)"
+        Write-Log "ERROR: Failed to create asset for $($Printer.Name): $($_.Exception.Message)"
         return $null
     }
 }
 
 # Main execution
-Write-Log "🚀 Starting Freshservice Printer Asset Integration (Simplified)"
+Write-Log "Starting Freshservice Printer Asset Integration (Simplified)"
 Write-Log "Computer: $env:COMPUTERNAME"
 
 # Load configuration
 $config = Load-Configuration -ConfigPath $ConfigFile
 if (-not $config) {
-    Write-Log "❌ Cannot proceed without configuration"
+    Write-Log "ERROR: Cannot proceed without configuration"
     exit 1
 }
 
 # Test connection
 $apiConfig = Test-FreshserviceConnection -Config $config
 if (-not $apiConfig) {
-    Write-Log "❌ Cannot proceed without Freshservice connection"
+    Write-Log "ERROR: Cannot proceed without Freshservice connection"
     exit 1
 }
 
 if ($TestConnection) {
-    Write-Log "✅ Connection test successful!"
+    Write-Log "SUCCESS: Connection test successful!"
     exit 0
 }
 
 # Get asset types from Freshservice
-Write-Log "📋 Getting asset types from Freshservice..."
+Write-Log "Getting asset types from Freshservice..."
 $assetTypes = Get-FreshserviceAssetTypes -ApiConfig $apiConfig
 if ($assetTypes.Count -eq 0) {
-    Write-Log "❌ Cannot proceed without asset types"
+    Write-Log "ERROR: Cannot proceed without asset types"
     exit 1
 }
 
@@ -354,28 +354,28 @@ if ($assetTypes.Count -eq 0) {
 $config | Add-Member -MemberType NoteProperty -Name "asset_types" -Value $assetTypes -Force
 
 # Scan for printers
-Write-Log "🔍 Scanning for printers..."
+Write-Log "Scanning for printers..."
 try {
     $printers = Get-PrinterInfoEnhanced
-    Write-Log "✅ Using enhanced printer scanner"
+    Write-Log "SUCCESS: Using enhanced printer scanner"
 } catch {
-    Write-Log "⚠️ Enhanced scanner not available, using simple scanner"
+    Write-Log "WARNING: Enhanced scanner not available, using simple scanner"
     $printers = Get-PrinterInfoSimple
 }
 
 if ($printers.Count -eq 0) {
-    Write-Log "⚠️ No printers found on this computer"
+    Write-Log "WARNING: No printers found on this computer"
     exit 0
 }
 
-Write-Log "📊 Found $($printers.Count) printer(s)"
+Write-Log "Found $($printers.Count) printer(s)"
 
 # Process each printer
 $createdAssets = @()
 $skippedAssets = @()
 
 foreach ($printer in $printers) {
-    Write-Log "🖨️ Processing printer: $($printer.Name)"
+    Write-Log "Processing printer: $($printer.Name)"
     
     $newAsset = New-FreshserviceAsset -ApiConfig $apiConfig -Config $config -Printer $printer
     if ($newAsset) {
@@ -387,13 +387,13 @@ foreach ($printer in $printers) {
 
 # Summary
 Write-Log ""
-Write-Log "📋 Integration Summary:"
+Write-Log "Integration Summary:"
 Write-Log "   Created: $($createdAssets.Count) new assets"
 Write-Log "   Skipped: $($skippedAssets.Count) printers"
 
 if ($createdAssets.Count -gt 0) {
-    Write-Log "✅ New assets created:"
+    Write-Log "SUCCESS: New assets created:"
     $createdAssets | ForEach-Object { Write-Log "   - $($_.display_id): $($_.name)" }
 }
 
-Write-Log "🎉 Freshservice integration completed!"
+Write-Log "Freshservice integration completed!"
