@@ -19,8 +19,14 @@ A native Windows tool to scan for USB printers and extract model and serial numb
 
 - `printer_scanner.ps1` - Basic PowerShell script for USB printer scanning
 - `printer_scanner_enhanced.ps1` - Enhanced version with multiple detection methods
-- `scan_printers.bat` - Batch wrapper for easy PDQ deployment
-- `requirements.txt` - Python dependencies (not needed for native Windows tools)
+- `printer_scanner_fast.ps1` - Fast version optimized for quick scanning
+- `scan_printers.bat` - Batch wrapper for enhanced scanner
+- `scan_printers_fast.bat` - Batch wrapper for fast scanner
+- `freshservice_printer_asset.ps1` - Freshservice integration script
+- `freshservice_printer_asset_simple.ps1` - Simplified Freshservice integration
+- `freshservice_config.json` - Configuration file for Freshservice settings
+- `add_printers_to_freshservice.bat` - Batch wrapper for Freshservice integration
+- `add_printers_simple.bat` - Simple batch wrapper for Freshservice integration
 
 ## PDQ Deployment Instructions
 
@@ -73,6 +79,88 @@ powershell.exe -ExecutionPolicy Bypass -File "printer_scanner_enhanced.ps1" -Out
 ```powershell
 .\printer_scanner_enhanced.ps1 -Verbose -ExportCSV
 ```
+
+## Freshservice Integration
+
+This tool can automatically add discovered printers as assets in Freshservice. This is particularly useful for Epson label printers and other USB/COM printers.
+
+### Setup
+
+1. **Configure Freshservice Settings**:
+   Edit `freshservice_config.json` with your Freshservice domain and API key:
+   ```json
+   {
+       "freshservice": {
+           "domain": "yourcompany",
+           "api_key": "your-api-key-here",
+           "default_asset_type": "Printer",
+           "default_location": "Main Office",
+           "default_department": "IT"
+       }
+   }
+   ```
+
+2. **Get Freshservice API Key**:
+   - Log into your Freshservice instance
+   - Go to Admin → API Settings
+   - Generate a new API key
+   - Copy the key to the config file
+
+### Usage
+
+#### Simple Method (Recommended)
+```batch
+add_printers_simple.bat
+```
+
+#### Advanced Method
+```batch
+add_printers_to_freshservice.bat yourcompany your-api-key "Label Printer" "Main Office" "IT"
+```
+
+#### PowerShell Direct
+```powershell
+.\freshservice_printer_asset_simple.ps1
+```
+
+#### Test Connection
+```powershell
+.\freshservice_printer_asset_simple.ps1 -TestConnection
+```
+
+#### Dry Run (Preview)
+```powershell
+.\freshservice_printer_asset_simple.ps1 -DryRun
+```
+
+### Asset Information Captured
+
+The following information is captured for each printer asset:
+
+- **Basic Info**: Name, Description, Asset Tag, Serial Number
+- **Hardware**: Manufacturer, Model
+- **Connection**: Port Name, Driver Name, Device ID
+- **Network**: IP Address, Network Protocol (for network printers)
+- **Discovery**: Source, Status, Computer Name, Discovery Date
+- **Computer Association**: Automatically linked to the computer asset (hostname) as a child asset
+
+### Computer Asset Association
+
+Printer assets are automatically associated with the computer they're connected to:
+
+- **Parent-Child Relationship**: Printers become child assets of the computer asset
+- **Hostname Matching**: Searches for computer assets by hostname
+- **Asset Type Detection**: Looks for Computer, Laptop, or Desktop asset types
+- **Automatic Linking**: Uses `parent_asset_id` to establish the relationship
+
+### Epson Label Printer Support
+
+Epson TM-T88 and similar label printers are automatically detected and categorized as "Label Printer" assets with:
+
+- **Serial Number Decoding**: Hex-encoded serial numbers are properly decoded
+- **USB Controller Detection**: Links USB controllers to virtual COM ports
+- **Printer Queue Association**: Connects printer queues to physical devices
+- **Computer Association**: Linked to the computer asset as child assets
 
 ## Output Information
 

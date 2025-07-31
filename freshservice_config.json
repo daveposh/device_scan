@@ -1,0 +1,41 @@
+{
+    "freshservice": {
+        "domain": "yourcompany",
+        "api_key": "your-api-key-here",
+        "default_asset_type": "Printer",
+        "default_location": "Main Office",
+        "default_department": "IT"
+    },
+    "asset_fields": {
+        "custom_fields": {
+            "port_name": "Port Name",
+            "driver_name": "Driver Name", 
+            "device_id": "Device ID",
+            "source": "Discovery Source",
+            "status": "Device Status",
+            "ip_address": "IP Address",
+            "network_protocol": "Network Protocol",
+            "computer_name": "Computer Name",
+            "discovery_date": "Discovery Date",
+            "last_updated": "Last Updated"
+        }
+    },
+    "printer_types": {
+        "epson": {
+            "keywords": ["Epson", "TM-T88", "TM-T", "TM-U", "TM-H", "TM-L", "TM-S", "TM-BA", "TM-EU"],
+            "asset_type": "Label Printer"
+        },
+        "brother": {
+            "keywords": ["Brother"],
+            "asset_type": "Printer"
+        },
+        "hp": {
+            "keywords": ["HP", "Hewlett-Packard"],
+            "asset_type": "Printer"
+        },
+        "canon": {
+            "keywords": ["Canon"],
+            "asset_type": "Printer"
+        }
+    }
+} 
