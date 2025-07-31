@@ -163,12 +163,14 @@ function New-FreshserviceAsset {
             Write-Log "⚠️ Computer asset not found for hostname: $env:COMPUTERNAME"
         }
         
-        # Prepare asset data
+        # Prepare asset data according to Freshservice API specification
+        $assetTag = if ($Printer.SerialNumber) { $Printer.SerialNumber } else { "PRN-$(Get-Random -Minimum 1000 -Maximum 9999)" }
+        
         $assetData = @{
             asset_type_id = $AssetTypeId
             name = $Printer.Name
             description = "Auto-discovered printer from device scan on $env:COMPUTERNAME"
-            asset_tag = if ($Printer.SerialNumber) { $Printer.SerialNumber } else { "PRN-$(Get-Random -Minimum 1000 -Maximum 9999)" }
+            asset_tag = $assetTag
             serial_number = $Printer.SerialNumber
             manufacturer = $Printer.Manufacturer
             model = $Printer.Model

@@ -6,6 +6,13 @@
         "default_location": "Main Office",
         "default_department": "IT"
     },
+    "asset_types": {
+        "printer": "Printer",
+        "label_printer": "Label Printer",
+        "computer": "Computer",
+        "laptop": "Laptop",
+        "desktop": "Desktop"
+    },
     "asset_fields": {
         "custom_fields": {
             "port_name": "Port Name",

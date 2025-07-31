@@ -61,6 +61,20 @@ function Test-FreshserviceConnection {
     }
 }
 
+function Get-FreshserviceAssetTypes {
+    param($ApiConfig)
+    
+    try {
+        $response = Invoke-RestMethod -Uri "$($ApiConfig.BaseUrl)/asset_types" -Headers $ApiConfig.Headers -Method Get -ErrorAction Stop
+        Write-Log "✅ Retrieved $($response.asset_types.Count) asset types from Freshservice"
+        return $response.asset_types
+    }
+    catch {
+        Write-Log "❌ Failed to get asset types: $($_.Exception.Message)"
+        return @()
+    }
+}
+
 function Get-PrinterAssetType {
     param(
         $Config,
@@ -166,14 +180,26 @@ function New-FreshserviceAsset {
             Write-Log "⚠️ Computer asset not found for hostname: $env:COMPUTERNAME"
         }
         
-        # Determine asset type based on printer
-        $assetType = Get-PrinterAssetType -Config $Config -PrinterName $Printer.Name
+        # Get asset type ID based on printer
+        $assetTypeName = Get-PrinterAssetType -Config $Config -PrinterName $Printer.Name
+        $assetTypeId = ($Config.asset_types | Where-Object { $_.name -eq $assetTypeName }).id
+        if (-not $assetTypeId) {
+            # Fallback to default asset type
+            $assetTypeId = ($Config.asset_types | Where-Object { $_.name -eq $Config.freshservice.default_asset_type }).id
+            if (-not $assetTypeId) {
+                # Use first available asset type
+                $assetTypeId = ($Config.asset_types | Select-Object -First 1).id
+            }
+        }
         
-        # Prepare asset data
+        # Prepare asset data according to Freshservice API specification
+        $assetTag = if ($Printer.SerialNumber) { $Printer.SerialNumber } else { "PRN-$(Get-Random -Minimum 1000 -Maximum 9999)" }
+        
         $assetData = @{
+            asset_type_id = $assetTypeId
             name = $Printer.Name
             description = "Auto-discovered printer from device scan on $env:COMPUTERNAME"
-            asset_tag = if ($Printer.SerialNumber) { $Printer.SerialNumber } else { "PRN-$(Get-Random -Minimum 1000 -Maximum 9999)" }
+            asset_tag = $assetTag
             serial_number = $Printer.SerialNumber
             manufacturer = $Printer.Manufacturer
             model = $Printer.Model
@@ -196,7 +222,8 @@ function New-FreshserviceAsset {
         }
         
         if ($DryRun) {
-            Write-Log "🔍 DRY RUN: Would create $assetType asset for $($Printer.Name)"
+            Write-Log "🔍 DRY RUN: Would create $assetTypeName asset for $($Printer.Name)"
+            Write-Log "   Asset Type ID: $assetTypeId"
             if ($computerAsset) {
                 Write-Log "   Associated with computer: $($computerAsset.name) (ID: $($computerAsset.id))"
             }
@@ -207,7 +234,7 @@ function New-FreshserviceAsset {
         $body = $assetData | ConvertTo-Json -Depth 3
         $response = Invoke-RestMethod -Uri "$($ApiConfig.BaseUrl)/assets" -Headers $ApiConfig.Headers -Method Post -Body $body -ErrorAction Stop
         
-        Write-Log "✅ Successfully created asset: $($response.asset.display_id) - $($response.asset.name) (Type: $assetType)"
+        Write-Log "✅ Successfully created asset: $($response.asset.display_id) - $($response.asset.name) (Type: $assetTypeName)"
         if ($computerAsset) {
             Write-Log "   Associated with computer: $($computerAsset.name)"
         }
@@ -242,6 +269,17 @@ if ($TestConnection) {
     Write-Log "✅ Connection test successful!"
     exit 0
 }
+
+# Get asset types from Freshservice
+Write-Log "📋 Getting asset types from Freshservice..."
+$assetTypes = Get-FreshserviceAssetTypes -ApiConfig $apiConfig
+if ($assetTypes.Count -eq 0) {
+    Write-Log "❌ Cannot proceed without asset types"
+    exit 1
+}
+
+# Add asset types to config for easy lookup
+$config | Add-Member -MemberType NoteProperty -Name "asset_types" -Value $assetTypes -Force
 
 # Scan for printers
 Write-Log "🔍 Scanning for printers..."
