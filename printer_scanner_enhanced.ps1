@@ -910,34 +910,6 @@ function Get-PrinterQueueDetails {
                     # Continue if registry lookup fails
                 }
             }
-                
-                # Try to match with device manager devices by port
-                try {
-                    $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
-                                  Where-Object { $_.DeviceID -like "*USB*" -or $_.DeviceID -like "*COM*" }
-                    
-                    foreach ($device in $usbDevices) {
-                        # Try to match by port name or printer name
-                        if ($device.Name -like "*$($printer.Name)*" -or 
-                            $device.Name -like "*$($printer.DriverName)*" -or
-                            $printer.Name -like "*$($device.Name)*") {
-                            
-                            if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
-                                $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
-                                $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                            }
-                            elseif ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]{8,})") {
-                                $hexSerial = $matches[3]
-                                $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
-                                $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
-                            }
-                            break
-                        }
-                    }
-                } catch {
-                    # Continue if device matching fails
-                }
-            }
             
             $printerQueues += $queueInfo
         }
