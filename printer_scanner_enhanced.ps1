@@ -1277,6 +1277,11 @@ function Consolidate-PrinterInfo {
     $consolidated = @{}
     
     foreach ($printer in $AllPrinters) {
+        # Skip if printer object is null or has no name
+        if (-not $printer -or -not $printer.Name) {
+            continue
+        }
+        
         # Use different keys for different source types
         $key = $printer.Name.ToLower()
         $queueKey = if ($printer.QueueName) { $printer.QueueName.ToLower() } else { $key }
@@ -1353,6 +1358,11 @@ function Generate-PrinterOnlyReport {
         $actualPrinters = @()
         
         foreach ($printer in $AllPrinters) {
+            # Skip if printer object is null or has no name
+            if (-not $printer -or -not $printer.Name) {
+                continue
+            }
+            
             $isActualPrinter = $false
             
             # Check if this is an actual printer device
