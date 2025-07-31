@@ -78,6 +78,10 @@ function Get-PrinterInfoDeviceManager {
         # Method 1: Query ALL Win32_PnPEntity devices (not just USB)
         $pnpDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue
         
+        # Also query USB devices specifically (like fast script)
+        $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
+                      Where-Object { $_.DeviceID -like "*USB*" }
+        
         foreach ($device in $pnpDevices) {
             # Exclude non-printer devices first
             if ($device.Name -like "*Fingerprint*" -or
@@ -105,7 +109,7 @@ function Get-PrinterInfoDeviceManager {
                 $device.Name -like "*Smart Card*" -or
                 $device.Name -like "*USB Hub*" -or
                 $device.Name -like "*USB Root*" -or
-                $device.Name -like "*USB Controller*" -and $device.Name -notlike "*Epson*" -or
+                ($device.Name -like "*USB Controller*" -and $device.Name -notlike "*Epson*") -or
                 $device.Name -like "*Composite*" -or
                 $device.Name -like "*Bus Enumerator*" -or
                 $device.Name -like "*Microsoft*" -or
@@ -129,6 +133,7 @@ function Get-PrinterInfoDeviceManager {
                 $device.Name -like "*HP*" -or
                 $device.Name -like "*Canon*" -or
                 $device.Name -like "*Epson*" -or
+                $device.Name -like "*TM*" -or
                 $device.Name -like "*TM-T88*" -or
                 $device.Name -like "*TM-T*" -or
                 $device.Name -like "*TM-U*" -or
@@ -210,6 +215,110 @@ function Get-PrinterInfoDeviceManager {
                     Description = $device.Description
                     Status = $device.Status
                     Source = "DeviceManager_WMI"
+                    SerialNumber = $null
+                    VID = $null
+                    PID = $null
+                    HardwareID = $device.HardwareID
+                    CompatibleID = $device.CompatibleID
+                    Class = $device.PNPClass
+                }
+                
+                # Extract serial number and manufacturer info from device ID
+                if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
+                    $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
+                    $deviceInfo.VID = $matches[1]
+                    $deviceInfo.PID = $matches[2]
+                    $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
+                }
+                
+                $printerDevices += $deviceInfo
+            }
+        }
+        
+        # Method 1.5: Query USB devices specifically (like fast script)
+        foreach ($device in $usbDevices) {
+            # Exclude non-printer devices first
+            if ($device.Name -like "*Fingerprint*" -or
+                $device.Name -like "*Scanner*" -or
+                $device.Name -like "*Camera*" -or
+                $device.Name -like "*Webcam*" -or
+                $device.Name -like "*Microphone*" -or
+                $device.Name -like "*Audio*" -or
+                $device.Name -like "*Speaker*" -or
+                $device.Name -like "*Headset*" -or
+                $device.Name -like "*Mouse*" -or
+                $device.Name -like "*Keyboard*" -or
+                $device.Name -like "*Touchpad*" -or
+                $device.Name -like "*Trackpad*" -or
+                $device.Name -like "*Monitor*" -or
+                $device.Name -like "*Display*" -or
+                $device.Name -like "*Graphics*" -or
+                $device.Name -like "*Video*" -or
+                $device.Name -like "*Network*" -or
+                $device.Name -like "*Ethernet*" -or
+                $device.Name -like "*WiFi*" -or
+                $device.Name -like "*Wireless*" -or
+                $device.Name -like "*Bluetooth*" -or
+                $device.Name -like "*Card Reader*" -or
+                $device.Name -like "*Smart Card*" -or
+                $device.Name -like "*USB Hub*" -or
+                $device.Name -like "*USB Root*" -or
+                ($device.Name -like "*USB Controller*" -and $device.Name -notlike "*Epson*") -or
+                $device.Name -like "*Composite*" -or
+                $device.Name -like "*Bus Enumerator*" -or
+                $device.Name -like "*Microsoft*" -or
+                $device.Name -like "*OneNote*" -or
+                $device.Name -like "*Fax*" -or
+                $device.Name -like "*XPS*" -or
+                $device.Name -like "*PDF*" -or
+                $device.Name -like "*Dock*" -or
+                $device.Name -like "*Dell Dock*" -or
+                $device.Name -like "*WD19S*" -or
+                $device.Name -like "*Dell Dock WD19S*" -or
+                $device.Name -like "*Docking*" -or
+                $device.Name -like "*Port Replicator*") {
+                # Skip this device - it's not a printer
+                continue
+            }
+            
+            # Look for printer devices (like fast script)
+            if ($device.Name -like "*printer*" -or 
+                $device.Name -like "*print*" -or
+                $device.Name -like "*HP*" -or
+                $device.Name -like "*Canon*" -or
+                $device.Name -like "*Epson*" -or
+                $device.Name -like "*TM*" -or
+                $device.Name -like "*Thermal*" -or
+                $device.Name -like "*Receipt*" -or
+                $device.Name -like "*POS*" -or
+                $device.Name -like "*Point of Sale*" -or
+                $device.Name -like "*USB-to-Serial*" -or
+                $device.Name -like "*USB Serial*" -or
+                $device.Name -like "*USB Controller*" -or
+                $device.Name -like "*Serial Port*" -or
+                $device.Name -like "*COM*" -or
+                $device.Name -like "*Brother*" -or
+                $device.Name -like "*Lexmark*" -or
+                $device.Name -like "*Xerox*" -or
+                $device.Name -like "*Samsung*" -or
+                $device.Name -like "*Ricoh*" -or
+                $device.Name -like "*Kyocera*" -or
+                $device.Name -like "*Sharp*" -or
+                $device.Name -like "*Konica*" -or
+                $device.Name -like "*Minolta*" -or
+                $device.Name -like "*OKI*" -or
+                $device.Name -like "*Toshiba*" -or
+                $device.Name -like "*Panasonic*" -or
+                $device.Name -like "*Fuji*") {
+                
+                $deviceInfo = [PSCustomObject]@{
+                    Name = $device.Name
+                    Model = $device.Name
+                    DeviceID = $device.DeviceID
+                    Manufacturer = $device.Manufacturer
+                    Description = $device.Description
+                    Status = $device.Status
+                    Source = "DeviceManager_USB"
                     SerialNumber = $null
                     VID = $null
                     PID = $null
