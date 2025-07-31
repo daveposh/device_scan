@@ -396,4 +396,4 @@ if ($createdAssets.Count -gt 0) {
     $createdAssets | ForEach-Object { Write-Log "   - $($_.display_id): $($_.name)" }
 }
 
-Write-Log "🎉 Freshservice integration completed!" 
+Write-Log "🎉 Freshservice integration completed!"
