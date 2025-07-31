@@ -12,13 +12,18 @@ param(
     [switch]$TestConnection
 )
 
-# Import the printer scanner functions
-. .\printer_scanner_enhanced.ps1
-
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Write-Host "[$timestamp] $Message"
+}
+
+# Import the printer scanner functions
+try {
+    . .\printer_scanner_enhanced.ps1
+    Write-Log "✅ Successfully imported printer scanner functions"
+} catch {
+    Write-Log "⚠️ Could not import printer scanner, using built-in functions"
 }
 
 function Load-Configuration {
@@ -157,6 +162,73 @@ function Find-ComputerAsset {
     }
 }
 
+function Get-PrinterInfoSimple {
+    # Fallback printer scanning function if the enhanced scanner is not available
+    try {
+        $printers = @()
+        
+        # Method 1: Get printers from WMI
+        $wmiPrinters = Get-WmiObject -Class Win32_Printer -ErrorAction SilentlyContinue
+        foreach ($printer in $wmiPrinters) {
+            if ($printer.PortName -like "*USB*" -or $printer.PortName -like "*COM*") {
+                $printerInfo = [PSCustomObject]@{
+                    Name = $printer.Name
+                    Model = $printer.Model
+                    SerialNumber = $null
+                    Manufacturer = $printer.Manufacturer
+                    PortName = $printer.PortName
+                    DriverName = $printer.DriverName
+                    Status = $printer.Status
+                    Source = "WMI_Simple"
+                    DeviceID = $null
+                    IPAddress = $null
+                    NetworkProtocol = $null
+                }
+                $printers += $printerInfo
+            }
+        }
+        
+        # Method 2: Get USB devices
+        $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
+                      Where-Object { $_.DeviceID -like "*USB*" }
+        
+        foreach ($device in $usbDevices) {
+            if ($device.Name -like "*printer*" -or 
+                $device.Name -like "*Epson*" -or 
+                $device.Name -like "*HP*" -or 
+                $device.Name -like "*Canon*" -or 
+                $device.Name -like "*Brother*") {
+                
+                $serialNumber = $null
+                if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
+                    $serialNumber = $matches[3]
+                }
+                
+                $printerInfo = [PSCustomObject]@{
+                    Name = $device.Name
+                    Model = $device.Name
+                    SerialNumber = $serialNumber
+                    Manufacturer = $device.Manufacturer
+                    PortName = $null
+                    DriverName = $device.DriverName
+                    Status = $device.Status
+                    Source = "USB_Simple"
+                    DeviceID = $device.DeviceID
+                    IPAddress = $null
+                    NetworkProtocol = $null
+                }
+                $printers += $printerInfo
+            }
+        }
+        
+        return $printers
+    }
+    catch {
+        Write-Log "❌ Error in simple printer scanning: $($_.Exception.Message)"
+        return @()
+    }
+}
+
 function New-FreshserviceAsset {
     param(
         $ApiConfig,
@@ -283,7 +355,13 @@ $config | Add-Member -MemberType NoteProperty -Name "asset_types" -Value $assetT
 
 # Scan for printers
 Write-Log "🔍 Scanning for printers..."
-$printers = Get-PrinterInfoEnhanced
+try {
+    $printers = Get-PrinterInfoEnhanced
+    Write-Log "✅ Using enhanced printer scanner"
+} catch {
+    Write-Log "⚠️ Enhanced scanner not available, using simple scanner"
+    $printers = Get-PrinterInfoSimple
+}
 
 if ($printers.Count -eq 0) {
     Write-Log "⚠️ No printers found on this computer"
