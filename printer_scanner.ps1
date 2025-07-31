@@ -20,8 +20,10 @@ function Write-Log {
 function Decode-HexSerial {
     param([string]$HexSerial)
     
+    $HexSerial = $HexSerial.Trim()  # Remove any leading/trailing whitespace or newlines
+    
     try {
-        if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0{4})$") {
+        if ($HexSerial.Length -eq 18 -and $HexSerial -match "^([A-Fa-f0-9]{8})([0-9]{6})(0{4})$") {
             $hexPart = $matches[1]  # First 8 hex characters
             $numberPart = $matches[2]  # Next 6 numbers
             $padding = $matches[3]  # Last 4 zeros
@@ -44,9 +46,22 @@ function Decode-HexSerial {
             }
         }
         
-        # If no Epson pattern found, return original
+        # Standard ASCII decoding (try this after Epson-specific decoding)
+        $bytes = @()
+        for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
+            $bytes += [Convert]::ToByte($HexSerial.Substring($i, 2), 16)
+        }
+        $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
+        
+        # Check if decoded result looks like a valid serial number
+        if ($decodedSerial -match '^[A-Za-z0-9\-_]+$' -and $decodedSerial.Length -gt 0) {
+            return "$HexSerial (Decoded: $decodedSerial)"
+        }
+        
+        # If no valid decoding found, return original hex
         return $HexSerial
     } catch {
+        # Return original hex if decoding fails
         return $HexSerial
     }
 }
@@ -101,11 +116,12 @@ function Get-USBPrinterInfo {
                           $_.Name -notlike "*Fax*" -and
                           $_.Name -notlike "*XPS*" -and
                                                      $_.Name -notlike "*PDF*" -and
-                           $_.Name -notlike "*Dock*" -and
-                           $_.Name -notlike "*Dell Dock*" -and
-                           $_.Name -notlike "*WD19S*" -and
-                           $_.Name -notlike "*Docking*" -and
-                           $_.Name -notlike "*Port Replicator*" -and
+                                                     $_.Name -notlike "*Dock*" -and
+                          $_.Name -notlike "*Dell Dock*" -and
+                          $_.Name -notlike "*WD19S*" -and
+                          $_.Name -notlike "*Dell Dock WD19S*" -and
+                          $_.Name -notlike "*Docking*" -and
+                          $_.Name -notlike "*Port Replicator*" -and
                           # Include printer devices
                           ($_.Name -like "*printer*" -or 
                            $_.Name -like "*print*" -or
@@ -232,7 +248,7 @@ function Get-PrinterDetails {
             # Try to get serial number from device ID or other properties
             if ($printer.DeviceID) {
                 # Extract serial number from device ID if present
-                if ($printer.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                if ($printer.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                     $details.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $details.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                 }
@@ -349,7 +365,7 @@ function Get-USBDeviceSerialNumbers {
             }
             
             # Extract serial number from instance ID if possible
-            if ($device.InstanceId -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                            if ($device.InstanceId -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                 $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                 $deviceInfo.VID = $matches[1]
                 $deviceInfo.PID = $matches[2]

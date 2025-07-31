@@ -22,53 +22,50 @@ function Write-Log {
 function Decode-HexSerial {
     param([string]$HexSerial)
     
+    $HexSerial = $HexSerial.Trim()  # Remove any leading/trailing whitespace or newlines
+    
     try {
-        if ($HexSerial.Length -ge 8 -and $HexSerial.Length % 2 -eq 0) {
-            # Special handling for Epson-style hex encoding: [8 hex chars][6 numbers][4 zero padding]
-            if ($HexSerial.Length -eq 20 -and $HexSerial -match "^([A-F0-9]{8})([0-9]{6})(0{4})$") {
-                $hexPart = $matches[1]  # First 8 hex characters
-                $numberPart = $matches[2]  # Next 6 numbers
-                $padding = $matches[3]  # Last 4 zeros
-                
-                # Decode the hex part
-                $hexDecoded = ""
-                for ($i = 0; $i -lt $hexPart.Length; $i += 2) {
-                    $hexPair = $hexPart.Substring($i, 2)
-                    $byteValue = [Convert]::ToByte($hexPair, 16)
-                    if ($byteValue -ge 32 -and $byteValue -le 126) {
-                        $hexDecoded += [char]$byteValue
-                    }
-                }
-                
-                # Combine hex decoded part with number part
-                $epsonDecoded = $hexDecoded + $numberPart
-                
-                if ($epsonDecoded.Length -gt 0) {
-                    return "$HexSerial (Epson Decoded: $epsonDecoded)"
+        if ($HexSerial.Length -eq 18 -and $HexSerial -match "^([A-Fa-f0-9]{8})([0-9]{6})(0{4})$") {
+            $hexPart = $matches[1]  # First 8 hex characters
+            $numberPart = $matches[2]  # Next 6 numbers
+            $padding = $matches[3]  # Last 4 zeros
+            
+            # Decode the hex part
+            $hexDecoded = ""
+            for ($i = 0; $i -lt $hexPart.Length; $i += 2) {
+                $hexPair = $hexPart.Substring($i, 2)
+                $byteValue = [Convert]::ToByte($hexPair, 16)
+                if ($byteValue -ge 32 -and $byteValue -le 126) {
+                    $hexDecoded += [char]$byteValue
                 }
             }
             
-            # Standard ASCII decoding (try this after Epson-specific decoding)
-            $bytes = @()
-            for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
-                $bytes += [Convert]::ToByte($HexSerial.Substring($i, 2), 16)
-            }
-            $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
+            # Combine hex decoded part with number part
+            $epsonDecoded = $hexDecoded + $numberPart
             
-            # Check if decoded result looks like a valid serial number
-            if ($decodedSerial -match '^[A-Za-z0-9\-_]+$' -and $decodedSerial.Length -gt 0) {
-                return "$HexSerial (Decoded: $decodedSerial)"
+            if ($epsonDecoded.Length -gt 0) {
+                return "$HexSerial (Epson Decoded: $epsonDecoded)"
             }
-            
-            # If no valid decoding found, return original hex
-            return $HexSerial
         }
+        
+        # Standard ASCII decoding (try this after Epson-specific decoding)
+        $bytes = @()
+        for ($i = 0; $i -lt $HexSerial.Length; $i += 2) {
+            $bytes += [Convert]::ToByte($HexSerial.Substring($i, 2), 16)
+        }
+        $decodedSerial = [System.Text.Encoding]::ASCII.GetString($bytes).TrimEnd([char]0)
+        
+        # Check if decoded result looks like a valid serial number
+        if ($decodedSerial -match '^[A-Za-z0-9\-_]+$' -and $decodedSerial.Length -gt 0) {
+            return "$HexSerial (Decoded: $decodedSerial)"
+        }
+        
+        # If no valid decoding found, return original hex
+        return $HexSerial
     } catch {
         # Return original hex if decoding fails
         return $HexSerial
     }
-    
-    return $HexSerial
 }
 
 # Function to get printer information from Device Manager via WMI
@@ -115,7 +112,13 @@ function Get-PrinterInfoDeviceManager {
                 $device.Name -like "*OneNote*" -or
                 $device.Name -like "*Fax*" -or
                 $device.Name -like "*XPS*" -or
-                $device.Name -like "*PDF*") {
+                $device.Name -like "*PDF*" -or
+                $device.Name -like "*Dock*" -or
+                $device.Name -like "*Dell Dock*" -or
+                $device.Name -like "*WD19S*" -or
+                $device.Name -like "*Dell Dock WD19S*" -or
+                $device.Name -like "*Docking*" -or
+                $device.Name -like "*Port Replicator*") {
                 # Skip this device - it's not a printer
                 continue
             }
@@ -216,7 +219,7 @@ function Get-PrinterInfoDeviceManager {
                 }
                 
                 # Extract serial number and manufacturer info from device ID
-                if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                     $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
@@ -274,14 +277,14 @@ function Get-PrinterInfoDeviceManager {
                 }
                 
                 # Extract serial number from device ID
-                if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                     $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
                     $deviceInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                 }
                 # Also check for hex-encoded serial numbers in device ID
-                elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
+                elseif ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]{8,})") {
                     $hexSerial = $matches[3]
                     $deviceInfo.SerialNumber = $hexSerial
                     $deviceInfo.VID = $matches[1]
@@ -363,7 +366,7 @@ function Get-PrinterInfoDeviceManager {
                         }
                         
                         # Extract serial number and manufacturer info from device ID
-                        if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                        if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                             $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                             $deviceInfo.VID = $matches[1]
                             $deviceInfo.PID = $matches[2]
@@ -520,7 +523,7 @@ function Get-PrinterInfoDeviceManagerRegistry {
                                     
                                     # Extract serial number from device path
                                     $devicePath = $device.PSPath
-                                    if ($devicePath -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                                    if ($devicePath -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                                         $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                                         $deviceInfo.VID = $matches[1]
                                         $deviceInfo.PID = $matches[2]
@@ -638,7 +641,7 @@ function Get-USBDeviceInfo {
                 }
                 
                 # Extract serial number and manufacturer info from instance ID
-                if ($device.InstanceId -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                if ($device.InstanceId -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                     $deviceInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $deviceInfo.VID = $matches[1]
                     $deviceInfo.PID = $matches[2]
@@ -716,11 +719,11 @@ function Get-DetailedDeviceInfo {
                 
                 # Try to extract serial number from various properties
                 if ($device.PSObject.Properties.Name -contains "SerialNumber" -and -not $device.SerialNumber) {
-                    if ($wmiDevice.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                    if ($wmiDevice.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                         $device.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     }
                     # Also check for hex-encoded serial numbers
-                    elseif ($wmiDevice.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
+                    elseif ($wmiDevice.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]{8,})") {
                         $hexSerial = $matches[3]
                         $device.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
                     }
@@ -800,6 +803,8 @@ function Get-PrinterQueueDetails {
                 Manufacturer = $null
                 Model = $null
                 DeviceID = $null
+                IPAddress = $null
+                NetworkProtocol = $null
             }
             
             # Try to get additional information from WMI
@@ -836,11 +841,92 @@ function Get-PrinterQueueDetails {
                             $device.Name -like "*$($printer.DriverName)*" -or
                             $printer.Name -like "*$($device.Name)*") {
                             
-                            if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                            if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                                 $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                                 $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
                             }
-                            elseif ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]{8,})") {
+                            elseif ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]{8,})") {
+                                $hexSerial = $matches[3]
+                                $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
+                                $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
+                            }
+                            break
+                        }
+                    }
+                } catch {
+                    # Continue if device matching fails
+                }
+            }
+            
+            # Extract IP address for network printers
+            if ($printer.PortName -like "*IP*" -or $printer.PortName -like "*TCP*" -or $printer.PortName -like "*LPR*" -or $printer.PortName -like "*HTTP*") {
+                # Extract IP address from port name
+                if ($printer.PortName -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                    $queueInfo.IPAddress = $matches[1]
+                    $queueInfo.NetworkProtocol = "IP"
+                }
+                elseif ($printer.PortName -match "TCP:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                    $queueInfo.IPAddress = $matches[1]
+                    $queueInfo.NetworkProtocol = "TCP"
+                }
+                elseif ($printer.PortName -match "LPR:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                    $queueInfo.IPAddress = $matches[1]
+                    $queueInfo.NetworkProtocol = "LPR"
+                }
+                elseif ($printer.PortName -match "HTTP:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                    $queueInfo.IPAddress = $matches[1]
+                    $queueInfo.NetworkProtocol = "HTTP"
+                }
+                
+                # Try to get IP from registry for this printer
+                try {
+                    $printerKey = "HKLM:\SYSTEM\CurrentControlSet\Control\Print\Printers\$($printer.Name)"
+                    if (Test-Path $printerKey) {
+                        $printerReg = Get-ItemProperty -Path $printerKey -ErrorAction SilentlyContinue
+                        
+                        # Check for IP address in various registry values
+                        if ($printerReg.PortName -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                            $queueInfo.IPAddress = $matches[1]
+                        }
+                        elseif ($printerReg.Comment -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                            $queueInfo.IPAddress = $matches[1]
+                        }
+                        elseif ($printerReg.Location -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                            $queueInfo.IPAddress = $matches[1]
+                        }
+                        
+                        # Check for network protocol
+                        if ($printerReg.PortName -like "*TCP*") {
+                            $queueInfo.NetworkProtocol = "TCP"
+                        }
+                        elseif ($printerReg.PortName -like "*LPR*") {
+                            $queueInfo.NetworkProtocol = "LPR"
+                        }
+                        elseif ($printerReg.PortName -like "*HTTP*") {
+                            $queueInfo.NetworkProtocol = "HTTP"
+                        }
+                    }
+                } catch {
+                    # Continue if registry lookup fails
+                }
+            }
+                
+                # Try to match with device manager devices by port
+                try {
+                    $usbDevices = Get-WmiObject -Class Win32_PnPEntity -ErrorAction SilentlyContinue | 
+                                  Where-Object { $_.DeviceID -like "*USB*" -or $_.DeviceID -like "*COM*" }
+                    
+                    foreach ($device in $usbDevices) {
+                        # Try to match by port name or printer name
+                        if ($device.Name -like "*$($printer.Name)*" -or 
+                            $device.Name -like "*$($printer.DriverName)*" -or
+                            $printer.Name -like "*$($device.Name)*") {
+                            
+                            if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
+                                $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
+                                $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
+                            }
+                            elseif ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]{8,})") {
                                 $hexSerial = $matches[3]
                                 $queueInfo.SerialNumber = Decode-HexSerial -HexSerial $hexSerial
                                 $queueInfo.Manufacturer = "VID: $($matches[1]), PID: $($matches[2])"
@@ -860,6 +946,136 @@ function Get-PrinterQueueDetails {
         
     } catch {
         Write-Log "Error getting printer queue details: $($_.Exception.Message)" "ERROR"
+        return @()
+    }
+}
+
+# Function to detect network printers and extract IP addresses
+function Get-NetworkPrinterInfo {
+    Write-Log "Detecting network printers and extracting IP addresses..."
+    
+    try {
+        $networkPrinters = @()
+        
+        # Get all printers from print management
+        $printers = Get-Printer -ErrorAction SilentlyContinue
+        
+        foreach ($printer in $printers) {
+            # Check if this is a network printer
+            if ($printer.PortName -like "*IP*" -or 
+                $printer.PortName -like "*TCP*" -or 
+                $printer.PortName -like "*LPR*" -or 
+                $printer.PortName -like "*HTTP*" -or
+                $printer.PortName -like "*192.168.*" -or
+                $printer.PortName -like "*10.*" -or
+                $printer.PortName -like "*172.*" -or
+                $printer.PortName -match "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}") {
+                
+                $networkInfo = [PSCustomObject]@{
+                    Name = $printer.Name
+                    Model = $printer.Name
+                    PortName = $printer.PortName
+                    DriverName = $printer.DriverName
+                    Location = $printer.Location
+                    Comment = $printer.Comment
+                    Status = $printer.PrinterStatus
+                    Default = $printer.Default
+                    Shared = $printer.Shared
+                    Published = $printer.Published
+                    Source = "NetworkPrinter"
+                    SerialNumber = $null
+                    Manufacturer = $null
+                    IPAddress = $null
+                    NetworkProtocol = $null
+                    DeviceID = $null
+                }
+                
+                # Extract IP address from port name
+                if ($printer.PortName -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                    $networkInfo.IPAddress = $matches[1]
+                }
+                
+                # Determine network protocol
+                if ($printer.PortName -like "*TCP*") {
+                    $networkInfo.NetworkProtocol = "TCP"
+                }
+                elseif ($printer.PortName -like "*LPR*") {
+                    $networkInfo.NetworkProtocol = "LPR"
+                }
+                elseif ($printer.PortName -like "*HTTP*") {
+                    $networkInfo.NetworkProtocol = "HTTP"
+                }
+                elseif ($printer.PortName -like "*IP*") {
+                    $networkInfo.NetworkProtocol = "IP"
+                }
+                else {
+                    $networkInfo.NetworkProtocol = "Unknown"
+                }
+                
+                # Try to get additional information from registry
+                try {
+                    $printerKey = "HKLM:\SYSTEM\CurrentControlSet\Control\Print\Printers\$($printer.Name)"
+                    if (Test-Path $printerKey) {
+                        $printerReg = Get-ItemProperty -Path $printerKey -ErrorAction SilentlyContinue
+                        
+                        # Check for IP address in various registry values
+                        if (-not $networkInfo.IPAddress -and $printerReg.PortName -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                            $networkInfo.IPAddress = $matches[1]
+                        }
+                        if (-not $networkInfo.IPAddress -and $printerReg.Comment -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                            $networkInfo.IPAddress = $matches[1]
+                        }
+                        if (-not $networkInfo.IPAddress -and $printerReg.Location -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})") {
+                            $networkInfo.IPAddress = $matches[1]
+                        }
+                        
+                        # Check for manufacturer info
+                        if ($printer.Name -like "*Brother*") {
+                            $networkInfo.Manufacturer = "Brother"
+                        }
+                        elseif ($printer.Name -like "*HP*") {
+                            $networkInfo.Manufacturer = "HP"
+                        }
+                        elseif ($printer.Name -like "*Canon*") {
+                            $networkInfo.Manufacturer = "Canon"
+                        }
+                        elseif ($printer.Name -like "*Epson*") {
+                            $networkInfo.Manufacturer = "Epson"
+                        }
+                        elseif ($printer.Name -like "*Lexmark*") {
+                            $networkInfo.Manufacturer = "Lexmark"
+                        }
+                        elseif ($printer.Name -like "*Xerox*") {
+                            $networkInfo.Manufacturer = "Xerox"
+                        }
+                        elseif ($printer.Name -like "*Samsung*") {
+                            $networkInfo.Manufacturer = "Samsung"
+                        }
+                        elseif ($printer.Name -like "*Ricoh*") {
+                            $networkInfo.Manufacturer = "Ricoh"
+                        }
+                        elseif ($printer.Name -like "*Kyocera*") {
+                            $networkInfo.Manufacturer = "Kyocera"
+                        }
+                        elseif ($printer.Name -like "*Sharp*") {
+                            $networkInfo.Manufacturer = "Sharp"
+                        }
+                        elseif ($printer.Name -like "*Konica*" -or $printer.Name -like "*Minolta*") {
+                            $networkInfo.Manufacturer = "Konica Minolta"
+                        }
+                    }
+                } catch {
+                    # Continue if registry lookup fails
+                }
+                
+                $networkPrinters += $networkInfo
+            }
+        }
+        
+        return $networkPrinters
+        
+    } catch {
+        Write-Log "Error detecting network printers: $($_.Exception.Message)" "ERROR"
         return @()
     }
 }
@@ -904,7 +1120,7 @@ function Get-EpsonUSBControllers {
                 }
                 
                 # Extract serial number and manufacturer info from device ID
-                if ($device.DeviceID -match "USB\\VID_([A-F0-9]{4})&PID_([A-F0-9]{4})\\([A-F0-9]+)") {
+                if ($device.DeviceID -match "USB\\VID_([A-Fa-f0-9]{4})&PID_([A-Fa-f0-9]{4})\\([A-Fa-f0-9]+)") {
                     $controllerInfo.SerialNumber = Decode-HexSerial -HexSerial $matches[3]
                     $controllerInfo.VID = $matches[1]
                     $controllerInfo.PID = $matches[2]
@@ -1204,6 +1420,13 @@ function Generate-PrinterOnlyReport {
                 $printerOnlyContent += "VID: $($printer.VID)"
                 $printerOnlyContent += "PID: $($printer.PID)"
                 
+                if ($printer.IPAddress) {
+                    $printerOnlyContent += "IP Address: $($printer.IPAddress)"
+                }
+                if ($printer.NetworkProtocol) {
+                    $printerOnlyContent += "Network Protocol: $($printer.NetworkProtocol)"
+                }
+                
                 if ($printer.QueueName -and $printer.QueueName -ne $printer.Name) {
                     $printerOnlyContent += "Queue Name: $($printer.QueueName)"
                 }
@@ -1284,6 +1507,11 @@ $epsonControllers = Get-EpsonUSBControllers
 $allPrinters += $epsonControllers
 Write-Log "Found $($epsonControllers.Count) Epson USB controller(s) with COM port printers"
 
+# Method 9: Network Printers with IP Addresses (NEW)
+$networkPrinters = Get-NetworkPrinterInfo
+$allPrinters += $networkPrinters
+Write-Log "Found $($networkPrinters.Count) network printer(s) with IP addresses"
+
 # Get detailed information
 $detailedPrinters = Get-DetailedDeviceInfo -Devices $allPrinters
 
@@ -1313,6 +1541,12 @@ if ($finalPrinters.Count -eq 0) {
             Write-Log "  Device ID: $($printer.DeviceID)"
             Write-Log "  VID: $($printer.VID)"
             Write-Log "  PID: $($printer.PID)"
+            if ($printer.IPAddress) {
+                Write-Log "  IP Address: $($printer.IPAddress)"
+            }
+            if ($printer.NetworkProtocol) {
+                Write-Log "  Network Protocol: $($printer.NetworkProtocol)"
+            }
             if ($printer.QueueName -and $printer.QueueName -ne $printer.Name) {
                 Write-Log "  Queue Name: $($printer.QueueName)"
             }
@@ -1350,6 +1584,8 @@ if ($finalPrinters.Count -eq 0) {
             DeviceID = $printer.DeviceID
             VID = $printer.VID
             PID = $printer.PID
+            IPAddress = $printer.IPAddress
+            NetworkProtocol = $printer.NetworkProtocol
             Shared = $printer.Shared
             Published = $printer.Published
             AssociatedCOM = $printer.AssociatedCOM
